@@ -4,7 +4,7 @@ organization: ""
 apps:
   gatewayApiCrds:
     appName: gateway-api-crds
-    chartName: gateway-api-crds-app
+    chartName: gateway-api-crds
     catalog: giantswarm
     enabled: true
     namespace: kube-system
@@ -19,7 +19,7 @@ apps:
     extraConfigs: []
   envoyGateway:
     appName: envoy-gateway
-    chartName: envoy-gateway-app
+    chartName: envoy-gateway
     catalog: giantswarm
     enabled: true
     namespace: envoy-gateway-system
@@ -34,7 +34,7 @@ apps:
     extraConfigs: []
   gatewayApiConfig:
     appName: gateway-api-config
-    chartName: gateway-api-config-app
+    chartName: gateway-api-config
     catalog: giantswarm
     enabled: true
     namespace: envoy-gateway-system
