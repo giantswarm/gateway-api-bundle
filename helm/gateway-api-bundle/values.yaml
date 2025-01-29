@@ -1,1 +1,19 @@
-{}
+clusterID: "test"
+organization: ""
+
+apps:
+  gatewayApiCrds:
+    appName: gateway-api-crds
+    chartName: gateway-api-crds-app
+    catalog: giantswarm
+    enabled: true
+    namespace: kube-system
+    # used by renovate
+    # repo: giantswarm/linkerd2-cni-app
+    version: 1.1.0
+    # User values can be provided via a ConfigMap or Secret for each individual app
+    userConfig: {}
+    # a list of extraConfigs for the App,
+    # It can be secret or configmap
+    # https://github.com/giantswarm/rfc/tree/main/multi-layer-app-config#example
+    extraConfigs: []
