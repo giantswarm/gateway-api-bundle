@@ -5,6 +5,32 @@
 {{- if .dependsOn -}}
 {{- $annotations := merge $annotations (dict "app-operator.giantswarm.io/depends-on" (include "app.name" (dict "app" .dependsOn "cluster" $.Values.clusterID "ns" $.Release.Namespace))) }}
 {{- end }}
+{{- if .userConfig }}
+{{- if .userConfig.configMap }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ $appName }}-user-values
+  namespace: {{ $.Release.Namespace }}
+data:
+  {{- (tpl (.userConfig.configMap | toYaml | toString) $) | nindent 2 }}
+{{- end }}
+{{- if .userConfig.secret }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ $appName }}-user-secrets
+  namespace: {{ $.Release.Namespace }}
+stringData:
+  {{- (tpl (.userConfig.secret | toYaml | toString) $) | nindent 2 }}
+{{- end }}
+{{- end }}
 ---
 apiVersion: application.giantswarm.io/v1alpha1
 kind: App
@@ -67,31 +93,5 @@ spec:
     {{- end }}
   {{- end }}
   {{- end }}
-{{- end }}
-{{- if .userConfig }}
-{{- if .userConfig.configMap }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  labels:
-    {{- include "labels.common" $ | nindent 4 }}
-  name: {{ $appName }}-user-values
-  namespace: {{ $.Release.Namespace }}
-data:
-  {{- (tpl (.userConfig.configMap | toYaml | toString) $) | nindent 2 }}
-{{- end }}
-{{- if .userConfig.secret }}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  labels:
-    {{- include "labels.common" $ | nindent 4 }}
-  name: {{ $appName }}-user-secrets
-  namespace: {{ $.Release.Namespace }}
-stringData:
-  {{- (tpl (.userConfig.secret | toYaml | toString) $) | nindent 2 }}
-{{- end }}
 {{- end }}
 {{- end }}
