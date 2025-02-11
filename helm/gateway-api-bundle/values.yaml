@@ -19,6 +19,8 @@ apps:
     extraConfigs: []
   envoyGateway:
     appName: envoy-gateway
+    annotations:
+      app-operator.giantswarm.io/depends-on: gateway-api-crds
     chartName: envoy-gateway
     catalog: giantswarm
     enabled: true
@@ -34,6 +36,8 @@ apps:
     extraConfigs: []
   gatewayApiConfig:
     appName: gateway-api-config
+    annotations:
+      app-operator.giantswarm.io/depends-on: envoy-gateway
     chartName: gateway-api-config
     catalog: giantswarm
     enabled: true
