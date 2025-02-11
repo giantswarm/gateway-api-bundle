@@ -3,7 +3,7 @@
 {{- if .enabled }}
 {{- $annotations := .annotations | default dict }}
 {{- if .dependsOn -}}
-{{- $annotations := merge $annotations (dict "app-operator.giantswarm.io/depends-on" (include "app.name" (dict "app" .dependsOn "cluster" $.Values.clusterID "ns" $.Release.Namespace))) }}
+{{- $annotations := merge $annotations (dict "app-operator.giantswarm.io/depends-on" (include "app.name" (dict "app" .dependsOn "cluster" $.Values.clusterID))) }}
 {{- end }}
 {{- if .userConfig }}
 {{- if .userConfig.configMap }}

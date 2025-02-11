@@ -19,10 +19,9 @@ apps:
     extraConfigs: []
   envoyGateway:
     appName: envoy-gateway
-    annotations:
-      app-operator.giantswarm.io/depends-on: gateway-api-crds
     chartName: envoy-gateway
     catalog: giantswarm
+    dependsOn: gateway-api-crds
     enabled: true
     namespace: envoy-gateway-system
     # used by renovate
@@ -36,10 +35,9 @@ apps:
     extraConfigs: []
   gatewayApiConfig:
     appName: gateway-api-config
-    annotations:
-      app-operator.giantswarm.io/depends-on: envoy-gateway
     chartName: gateway-api-config
     catalog: giantswarm
+    dependsOn: envoy-gateway
     enabled: true
     namespace: envoy-gateway-system
     # used by renovate
