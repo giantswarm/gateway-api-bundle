@@ -1,4 +1,5 @@
 version: 2.1
+
 orbs:
   architect: giantswarm/architect@6.0.0
 
@@ -6,17 +7,47 @@ workflows:
   package-and-push-chart-on-tag:
     jobs:
     - architect/push-to-app-catalog:
+        name: push-to-giantswarm-catalog
         context: architect
         executor: app-build-suite
-        name: package-and-push-chart
+        chart: 'gateway-api-bundle'
         app_catalog: giantswarm-catalog
         app_catalog_test: giantswarm-test-catalog
-        chart: 'gateway-api-bundle'
-          # Trigger job on git tag.
+        persist_chart_archive: true
         filters:
-          tags:
-            only: /^v.*/
           branches:
             ignore:
             - main
             - master
+          tags:
+            only: /^v.*/
+
+    - architect/push-to-app-catalog:
+        name: push-to-control-plane-catalog
+        context: architect
+        executor: app-build-suite
+        chart: 'gateway-api-bundle'
+        app_catalog: control-plane-catalog
+        app_catalog_test: control-plane-test-catalog
+        filters:
+          branches:
+            ignore:
+              - main
+              - master
+          tags:
+            only: /^v.*/
+
+    - architect/push-to-app-collection:
+        name: push-to-capa-app-collection
+        context: architect
+        app_catalog: control-plane-catalog
+        app_name: 'gateway-api-bundle'
+        app_namespace: org-giantswarm
+        app_collection_repo: capa-app-collection
+        requires:
+          - push-to-control-plane-catalog
+        filters:
+          branches:
+            ignore: /.*/
+          tags:
+            only: /^v.*/
