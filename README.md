@@ -51,9 +51,9 @@ See our [full reference on how to configure apps](https://docs.giantswarm.io/tut
 
 ## Compatibility
 
-This app has been tested to work with the following workload cluster release versions:
-
-- _add release version_
+| Gateway API Bundle | Gateway API CRD App | Envoy Gateway App |
+| --- | --- | --- |
+| 0.5.x | 1.3.0 (Gateway API v1.2.1) | 0.3.0 (EnvoyGateway 1.3.0) |
 
 ## Limitations
 
