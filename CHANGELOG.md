@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update dependency giantswarm/gateway-api-crds-app to v1.4.0 (#54)
+- Update dependency giantswarm/envoy-gateway-app to v1.0.0 (#54)
+
 ## [0.5.1] - 2025-10-16
 
 ### Changed
 
-- Update dependency giantswarm/gateway-api-crds-app to v1.3.0 (#32)
+- Update dependency giantswarm/gateway-api-crds-app to v1.3.0 (#51)
 
 ## [0.5.0] - 2025-06-25
 
