@@ -53,7 +53,8 @@ See our [full reference on how to configure apps](https://docs.giantswarm.io/tut
 
 | Gateway API Bundle | Gateway API CRD App | Envoy Gateway App |
 | --- | --- | --- |
-| 0.5.x | 1.3.0 (Gateway API v1.2.1) | 0.3.0 (EnvoyGateway 1.3.0) |
+| 1.0.x | 1.4.x (Gateway API v1.3.0) | 1.0.x (EnvoyGateway 1.4.x) |
+| 0.5.x | 1.3.0 (Gateway API v1.2.1) | 0.3.0 (EnvoyGateway 1.3.x) |
 
 ## Limitations
 
