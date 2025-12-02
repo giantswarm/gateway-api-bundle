@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update dependency giantswarm/gateway-api-config-app to v1.2.0 (#66)
+
 ## [1.3.0] - 2025-11-18
 
 ### Changed
