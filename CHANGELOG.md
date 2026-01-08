@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update Chart.yaml to use updated `io.giantswarm.application.team` annotation
+
 ## [1.6.0] - 2026-01-08
 
 ### Changed
