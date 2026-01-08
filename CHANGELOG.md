@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update Chart.yaml to use updated `io.giantswarm.application.team` annotation
+- Update dependency giantswarm/gateway-api-config-app to v1.4.1
 
 ## [1.6.0] - 2026-01-08
 
