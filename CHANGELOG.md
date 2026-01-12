@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.8.0] - 2026-01-12
 
 - Update dependency giantswarm/envoy-gateway-app to v1.4.0 (#82)
-- Update dependency giantswarm/gateway-api-config-app to v1.6.1 (#84)
+- Update dependency giantswarm/gateway-api-crds-app to v1.6.1 (#84)
 
 ## [1.7.0] - 2026-01-12
 
