@@ -49,3 +49,19 @@ apps:
     # It can be secret or configmap
     # https://github.com/giantswarm/rfc/tree/main/multi-layer-app-config#example
     extraConfigs: []
+  envoyAIGateway:
+    appName: envoy-ai-gateway
+    chartName: envoy-ai-gateway
+    catalog: giantswarm
+    dependsOn: gateway-api-crds
+    enabled: false
+    namespace: envoy-ai-gateway-system
+    # used by renovate
+    # repo: giantswarm/envoy-ai-gateway-app
+    version: 0.1.0
+    # User values can be provided via a ConfigMap or Secret for each individual app
+    userConfig: {}
+    # a list of extraConfigs for the App,
+    # It can be secret or configmap
+    # https://github.com/giantswarm/rfc/tree/main/multi-layer-app-config#example
+    extraConfigs: []
