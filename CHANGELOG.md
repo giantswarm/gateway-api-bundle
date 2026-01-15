@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Envoy AI Gateway app.
+
 ## [1.8.0] - 2026-01-12
 
 - Update dependency giantswarm/envoy-gateway-app to v1.4.0 (#82)
