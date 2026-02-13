@@ -9,7 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.12.1] - 2026-02-13
 
+### Changed
+
+- Update dependency giantswarm/gateway-api-crds-app to v1.7.0 (#104)
+
 ## [1.12.0] - 2026-02-12
+
+### Changed
 
 - Update dependency giantswarm/gateway-api-config-app to v1.7.0 (#101)
 
