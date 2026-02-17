@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Make App configMap compatible with string format or object.
+
 ## [1.12.2] - 2026-02-17
 
 ### Changed

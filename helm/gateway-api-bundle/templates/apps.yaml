@@ -16,7 +16,11 @@ metadata:
   name: {{ $appName }}-user-values
   namespace: {{ $.Release.Namespace }}
 data:
+  {{- if kindIs "string" .userConfig.configMap }}
+  {{- tpl .userConfig.configMap $ | nindent 2 }}
+  {{- else }}
   {{- (tpl (.userConfig.configMap | toYaml | toString) $) | nindent 2 }}
+  {{- end }}
 {{- end }}
 {{- if .userConfig.secret }}
 ---
