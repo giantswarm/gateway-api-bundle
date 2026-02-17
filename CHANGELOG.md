@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Make App configMap compatible with string format or object.
+- Allow setting objects in userConfig configmap and secret values
 
 ## [1.12.2] - 2026-02-17
 
