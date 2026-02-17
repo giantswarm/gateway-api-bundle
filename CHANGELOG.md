@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.3] - 2026-02-17
+
 ### Changed
 
 - Allow setting objects in userConfig configmap and secret values
@@ -161,7 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.2...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.3...HEAD
+[1.12.3]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.2...v1.12.3
 [1.12.2]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.11.0...v1.12.0
