@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update dependency giantswarm/gateway-api-config-app to v1.7.1 (#110)
+
 ## [1.12.3] - 2026-02-17
 
 ### Changed
@@ -17,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Update dependency giantswarm/gateway-api-crds-app to v1.7.1 (#106)
+- Update dependency giantswarm/gateway-api-config-app to v1.7.1 (#106)
 
 ## [1.12.1] - 2026-02-13
 
