@@ -1,10 +1,10 @@
 apiVersion: v2
-appVersion: 1.12.6
+appVersion: 1.12.7
 name: gateway-api-bundle
 description: Gateway API bundle
 home: https://github.com/giantswarm/gateway-api-bundle
 icon: https://s.giantswarm.io/app-icons/gateway-api/1/light.svg
-version: 1.12.6
+version: 1.12.7
 annotations:
   io.giantswarm.application.team: cabbage
   io.giantswarm.application.audience: "all"
