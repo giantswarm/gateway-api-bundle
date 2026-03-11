@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.10] - 2026-03-11
+
+### Changed
+
+- Update dependency giantswarm/gateway-api-config-app to v1.7.10 (#127)
+
 ## [1.12.9] - 2026-03-05
 
 ### Changed
@@ -199,7 +205,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.9...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.10...HEAD
+[1.12.10]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.9...v1.12.10
 [1.12.9]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.8...v1.12.9
 [1.12.8]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.7...v1.12.8
 [1.12.7]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.12.6...v1.12.7
