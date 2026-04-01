@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update dependency giantswarm/envoy-gateway-app to v1.6.1 (#121)
+  - Update envoy-gateway to [v1.7.1](https://github.com/envoyproxy/gateway/releases/tag/v1.7.1)
+- Update dependency giantswarm/gateway-api-config-app to v1.8.0 (#132)
+
 ## [1.12.11] - 2026-03-17
 
 ### Changed
