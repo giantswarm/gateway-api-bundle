@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.7.0 (#152)
+- chore(deps): update dependency giantswarm/gateway-api-crds-app to v1.8.0 (#153)
+
 ## [1.15.2] - 2026-05-26
 
 - chore(deps): update dependency giantswarm/envoy-gateway-app to v1.6.2 (#146)
