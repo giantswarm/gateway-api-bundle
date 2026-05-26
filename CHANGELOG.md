@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.15.2] - 2026-05-22
+## [1.15.2] - 2026-05-26
+
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.6.2 (#146)
 
 ## [1.15.1] - 2026-05-05
 
