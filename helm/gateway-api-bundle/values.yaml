@@ -20,13 +20,13 @@ apps:
   envoyGateway:
     appName: envoy-gateway
     chartName: envoy-gateway
-    catalog: giantswarm
+    catalog: giantswarm-test
     dependsOn: gateway-api-crds
     enabled: true
     namespace: envoy-gateway-system
     # used by renovate
     # repo: giantswarm/envoy-gateway-app
-    version: 1.7.0
+    version: 1.7.0-bf1259e4bcf215bb210687ee6f4ba7f6a5e2ab77
     # User values can be provided via a ConfigMap or Secret for each individual app
     userConfig: {}
     # a list of extraConfigs for the App,
