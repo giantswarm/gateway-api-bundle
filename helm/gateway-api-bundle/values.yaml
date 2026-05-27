@@ -5,12 +5,12 @@ apps:
   gatewayApiCrds:
     appName: gateway-api-crds
     chartName: gateway-api-crds
-    catalog: giantswarm
+    catalog: giantswarm-test
     enabled: true
     namespace: kube-system
     # used by renovate
     # repo: giantswarm/gateway-api-crds-app
-    version: 1.8.0
+    version: 1.8.0-3d9822fb5888f1e59a860fa3cfdf06dcfe0020d6
     # User values can be provided via a ConfigMap or Secret for each individual app
     userConfig: {}
     # a list of extraConfigs for the App,
