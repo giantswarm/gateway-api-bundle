@@ -5,12 +5,12 @@ apps:
   gatewayApiCrds:
     appName: gateway-api-crds
     chartName: gateway-api-crds
-    catalog: giantswarm-test
+    catalog: giantswarm
     enabled: true
     namespace: kube-system
     # used by renovate
     # repo: giantswarm/gateway-api-crds-app
-    version: 1.8.0-3d9822fb5888f1e59a860fa3cfdf06dcfe0020d6
+    version: 1.8.1
     # User values can be provided via a ConfigMap or Secret for each individual app
     userConfig: {}
     # a list of extraConfigs for the App,
@@ -20,13 +20,13 @@ apps:
   envoyGateway:
     appName: envoy-gateway
     chartName: envoy-gateway
-    catalog: giantswarm-test
+    catalog: giantswarm
     dependsOn: gateway-api-crds
     enabled: true
     namespace: envoy-gateway-system
     # used by renovate
     # repo: giantswarm/envoy-gateway-app
-    version: 1.7.0-4fcabcdcdafc3d1397126d7952f4828dcfec0925
+    version: 1.7.1
     # User values can be provided via a ConfigMap or Secret for each individual app
     userConfig: {}
     # a list of extraConfigs for the App,
