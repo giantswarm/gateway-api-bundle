@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.1] - 2026-06-08
+
+### Changed
+
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.7.2 (#163)
+  - Update Envoy Gateway to [v1.8.1](https://gateway.envoyproxy.io/news/releases/notes/v1.8.1) (data plane Envoy bumped to v1.38.1).
+- chore(deps): update dependency giantswarm/envoy-ai-gateway-app to v0.1.1 (#162)
+  - Update chart icon to use Giant Swarm-hosted Envoy AI Gateway icon.
+
 ## [1.16.0] - 2026-05-28
 
 ### Changed
@@ -250,7 +259,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.0...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.1...HEAD
+[1.16.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.0...v1.16.1
 [1.16.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.15.2...v1.16.0
 [1.15.2]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.15.1...v1.15.2
 [1.15.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.15.0...v1.15.1
