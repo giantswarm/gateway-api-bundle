@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.2] - 2026-06-11
+
+### Changed
+
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.7.3 (#167)
+  - Fixed: Correct the ports path and format in the Envoy Gateway ingress CiliumNetworkPolicy. The previous empty toPorts entry put the endpoint into default-deny mode, silently dropping all xDS connections from new proxy pods.
+
 ## [1.16.1] - 2026-06-08
 
 ### Changed
@@ -259,7 +266,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.1...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.2...HEAD
+[1.16.2]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.1...v1.16.2
 [1.16.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.0...v1.16.1
 [1.16.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.15.2...v1.16.0
 [1.15.2]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.15.1...v1.15.2
