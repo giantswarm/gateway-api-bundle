@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.17.1] - 2026-06-19
+
+### Changed
+
+- chore(deps): update dependency giantswarm/gateway-api-config-app to v1.11.1 (#175)
+  - Changed: Align the AWS NLB drain timers with the envoy graceful shutdown so the node always outlives the NLB connection drain, fixing Cloudflare 520 errors on node disruption (e.g. Karpenter). The gateway-level `EnvoyProxy` now sets `shutdown.minDrainDuration: 150s` and `shutdown.drainTimeout: 170s` (was 60s/180s), lowers the service `target_health_state.unhealthy.draining_interval_seconds` to `120` (was 200), and speeds up unhealthy-node detection via `aws-load-balancer-healthcheck-interval: 10` and `aws-load-balancer-healthcheck-unhealthy-threshold: 2`.
+  - Added: For CAPA gateways using an AWS NLB, set `karpenter.sh/do-not-disrupt: "true"` on the envoy proxy pod template to reduce voluntary Karpenter churn, and patch `terminationGracePeriodSeconds: 240` on the proxy Deployment so it stays above the drain timeout.
+  - Added: For CAPA gateways using an AWS NLB, add a preferred pod anti-affinity (`topologyKey: kubernetes.io/hostname`) on the proxy pod template so the proxy pods spread one-per-node, ensuring each NLB instance target maps to a single envoy.
+
 ## [1.17.0] - 2026-06-18
 
 ### Changed
@@ -275,7 +284,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.17.0...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.17.1...HEAD
+[1.17.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.17.0...v1.17.1
 [1.17.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.2...v1.17.0
 [1.16.2]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.1...v1.16.2
 [1.16.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.16.0...v1.16.1
