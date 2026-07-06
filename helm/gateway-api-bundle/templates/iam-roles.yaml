@@ -1,0 +1,56 @@
+{{- with .Values.iamRoles.cloudwatchExporter }}
+{{- if .enabled }}
+{{- $roleName := include "app.name" (dict "app" "cloudwatch-exporter" "cluster" $.Values.clusterID) }}
+{{- $oidc := printf "irsa.%s.%s" $.Values.clusterID $.Values.aws.baseDomain }}
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: Role
+metadata:
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ $roleName }}
+spec:
+  deletionPolicy: Delete
+  providerConfigRef:
+    name: {{ $.Values.clusterID }}
+  forProvider:
+    assumeRolePolicy: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::{{ $.Values.aws.accountID }}:oidc-provider/{{ $oidc }}"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "{{ $oidc }}:sub": "system:serviceaccount:{{ .namespace }}:{{ .serviceAccount }}",
+                "{{ $oidc }}:aud": "sts.amazonaws.com"
+              }
+            }
+          }
+        ]
+      }
+    inlinePolicy:
+    - name: cloudwatch-exporter-policy
+      policy: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "cloudwatch:GetMetricData",
+                "cloudwatch:GetMetricStatistics",
+                "cloudwatch:ListMetrics",
+                "iam:ListAccountAliases",
+                "tag:GetResources"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+{{- end }}
+{{- end }}

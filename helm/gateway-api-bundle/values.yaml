@@ -65,3 +65,41 @@ apps:
     # It can be secret or configmap
     # https://github.com/giantswarm/rfc/tree/main/multi-layer-app-config#example
     extraConfigs: []
+  cloudwatchExporter:
+    appName: cloudwatch-exporter
+    chartName: cloudwatch-exporter
+    catalog: giantswarm
+    enabled: false
+    namespace: envoy-gateway-system
+    # used by renovate
+    # repo: giantswarm/cloudwatch-exporter-app
+    version: 0.0.1
+    # Rendered against the release context via tpl; requires the aws.* values below.
+    userConfig:
+      configMap:
+        values:
+          clusterID: "{{ .Values.clusterID }}"
+          region: "{{ .Values.aws.region }}"
+          serviceAccount:
+            create: true
+            name: yace
+            annotations:
+              eks.amazonaws.com/role-arn: "{{ .Values.clusterID }}-cloudwatch-exporter"
+    extraConfigs: []
+
+# AWS context used to build IRSA trust policies for iamRoles (management-cluster side).
+aws:
+  accountID: ""
+  # IRSA OIDC provider host is built as irsa.<clusterID>.<baseDomain>
+  baseDomain: ""
+  region: ""
+
+# IAM roles provisioned on the management cluster via Crossplane (iam.aws.upbound.io).
+# Each role gets an IRSA trust policy for its service account on the workload cluster.
+# Full role name = <clusterID>-cloudwatch-exporter.
+iamRoles:
+  cloudwatchExporter:
+    enabled: false
+    # Service account (namespace/name) on the workload cluster allowed to assume the role.
+    namespace: envoy-gateway-system
+    serviceAccount: yace
