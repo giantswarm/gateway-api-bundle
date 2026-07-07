@@ -9,6 +9,7 @@ metadata:
   labels:
     {{- include "labels.common" $ | nindent 4 }}
   name: {{ $roleName }}
+  namespace: {{ $.Release.Namespace }}
 spec:
   deletionPolicy: Delete
   providerConfigRef:
