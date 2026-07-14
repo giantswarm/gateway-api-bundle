@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional cloudwatch-exporter (yace) App, deployed to `envoy-gateway-system` on the workload cluster, gated by `apps.cloudwatchExporter.enabled`.
 - Optional Crossplane IAM role (`iamRoles.cloudwatchExporter`) with an IRSA trust policy for the exporter's service account, provisioned on the management cluster.
 
+### Changed
+
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.8.0 (#176)
+  - Changed: Update Envoy Gateway to [v1.8.2](https://gateway.envoyproxy.io/news/releases/notes/v1.8.2) (data plane Envoy bumped to v1.38.3).
+
 ## [1.17.1] - 2026-06-19
 
 ### Changed
