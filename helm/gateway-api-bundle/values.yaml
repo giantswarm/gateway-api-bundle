@@ -21,7 +21,8 @@ apps:
     appName: envoy-gateway
     chartName: envoy-gateway
     catalog: giantswarm
-    dependsOn: gateway-api-crds
+    dependsOn:
+      - gateway-api-crds
     enabled: true
     namespace: envoy-gateway-system
     # used by renovate
@@ -37,7 +38,8 @@ apps:
     appName: gateway-api-config
     chartName: gateway-api-config
     catalog: giantswarm
-    dependsOn: envoy-gateway
+    dependsOn:
+      - envoy-gateway
     enabled: true
     namespace: envoy-gateway-system
     # used by renovate
@@ -53,7 +55,8 @@ apps:
     appName: envoy-ai-gateway
     chartName: envoy-ai-gateway
     catalog: giantswarm
-    dependsOn: gateway-api-crds
+    dependsOn:
+      - gateway-api-crds
     enabled: false
     namespace: envoy-ai-gateway-system
     # used by renovate
