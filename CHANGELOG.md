@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `pre-upgrade` migration hook that cordons the existing sub-`App` CRs before the `App` to `HelmRelease` switch, so chart-operator does not uninstall the running workloads and Flux can adopt the existing Helm releases. Gated by `migration.appToHelmRelease.enabled`; can be removed once all clusters have migrated.
+
 ### Changed
 
-- Migrate bundle's chart from `Apps` to `HelmReleases`. 
+- Migrate bundle's chart from `Apps` to `HelmReleases`.
 
 ## [1.18.0] - 2026-07-15
 
