@@ -56,14 +56,18 @@ spec:
   {{- $hasExtraConfigs := gt (len (.extraConfigs | default list)) 0 }}
   {{- $hasUserConfigMap := false }}
   {{- $hasUserSecret := false }}
-  {{- if $.Values.userConfig }}
-  {{- with (get $.Values.userConfig $key) }}
+  {{- with .userConfig }}
   {{- if .configMap }}{{ $hasUserConfigMap = true }}{{ end }}
   {{- if .secret }}{{ $hasUserSecret = true }}{{ end }}
   {{- end }}
-  {{- end }}
-  {{- if or $hasExtraConfigs $hasUserConfigMap $hasUserSecret }}
+  {{- if or $.Values.clusterID $hasExtraConfigs $hasUserConfigMap $hasUserSecret }}
   valuesFrom:
+  {{- if $.Values.clusterID }}
+  - kind: ConfigMap
+    name: {{ $.Values.clusterID }}-cluster-values
+    valuesKey: values
+    optional: true
+  {{- end }}
   {{- range $extraConfig := (.extraConfigs | default list) }}
   {{- $kind := $extraConfig.kind }}
   {{- if eq $kind "configMap" }}{{ $kind = "ConfigMap" }}{{ else if eq $kind "secret" }}{{ $kind = "Secret" }}{{ end }}
@@ -85,10 +89,7 @@ spec:
     optional: false
   {{- end }}
   {{- end }}
-{{- end }}
-
-{{- if $.Values.userConfig }}
-{{- with (get $.Values.userConfig $key) }}
+{{- with .userConfig }}
 {{- if ((.configMap).values) }}
 ---
 apiVersion: v1
