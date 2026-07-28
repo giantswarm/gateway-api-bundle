@@ -1,0 +1,109 @@
+{{- range $key, $value := .Values.apps }}
+{{- $appName := include "app.name" (dict "app" .appName "cluster" $.Values.clusterID "ns" $.Release.Namespace) }}
+{{- if and .enabled $appName }}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ $appName }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  url: oci://gsoci.azurecr.io/charts/giantswarm/{{ .chartName }}
+  ref:
+    tag: "{{ .version }}"
+  interval: 24h
+  timeout: 60s
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ $appName }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  releaseName: {{ .appName }}
+  targetNamespace: {{ .namespace }}
+  storageNamespace: {{ .namespace }}
+  chartRef:
+    kind: OCIRepository
+    name: {{ $appName }}
+  {{- if .dependsOn }}
+  dependsOn:
+  {{- range $dep := .dependsOn }}
+  - name: {{ $.Values.clusterID }}-{{ $dep }}
+    namespace: {{ $.Release.Namespace }}
+  {{- end }}
+  {{- end }}
+  kubeConfig:
+    secretRef:
+      name: {{ $.Values.clusterID }}-kubeconfig
+  interval: 5m
+  timeout: {{ .timeout | default "10m" }}
+  install:
+    {{- if .skipCRDs }}
+    crds: Skip
+    {{- end }}
+    remediation:
+      retries: -1
+      remediateLastFailure: false
+  upgrade:
+    remediation:
+      retries: -1
+      remediateLastFailure: false
+  {{- $hasUserConfigMap := false }}
+  {{- $hasUserSecret := false }}
+  {{- with .userConfig }}
+  {{- if .configMap }}{{ $hasUserConfigMap = true }}{{ end }}
+  {{- if .secret }}{{ $hasUserSecret = true }}{{ end }}
+  {{- end }}
+  {{- $clusterValuesConfigMap := "" }}
+  {{- if $.Values.clusterID }}{{ $clusterValuesConfigMap = printf "%s-cluster-values" $.Values.clusterID }}{{ end }}
+  {{- $userValuesConfigMap := "" }}
+  {{- if $hasUserConfigMap }}{{ $userValuesConfigMap = printf "%s-user-values" $appName }}{{ end }}
+  {{- $userValuesSecret := "" }}
+  {{- if $hasUserSecret }}{{ $userValuesSecret = printf "%s-user-secrets" $appName }}{{ end }}
+  {{- if or $clusterValuesConfigMap $userValuesConfigMap $userValuesSecret (gt (len (.extraConfigs | default list)) 0) }}
+  valuesFrom:
+  {{- include "app.sortedValuesFrom" (dict "clusterValuesConfigMap" $clusterValuesConfigMap "userValuesConfigMap" $userValuesConfigMap "userValuesSecret" $userValuesSecret "extraConfigs" (.extraConfigs | default list) "root" $) | nindent 2 }}
+  {{- end }}
+{{- with .userConfig }}
+{{- if ((.configMap).values) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ $appName }}-user-values
+  namespace: {{ $.Release.Namespace }}
+data:
+  {{- if kindIs "string" .configMap.values }}
+  {{- (tpl (.configMap | toYaml | toString) $) | nindent 2 }}
+  {{- else }}
+  values: |
+  {{- (tpl (.configMap.values | toYaml | toString) $) | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- if ((.secret).values) }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ $appName }}-user-secrets
+  namespace: {{ $.Release.Namespace }}
+stringData:
+  {{- if kindIs "string" .secret.values }}
+  {{- (tpl (.secret | toYaml | toString) $) | nindent 2 }}
+  {{- else }}
+  values: |
+  {{- (tpl (.secret.values | toYaml | toString) $) | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end -}}

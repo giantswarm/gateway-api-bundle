@@ -1,6 +1,23 @@
 clusterID: "test"
 organization: ""
 
+# Migration machinery for the App -> Flux HelmRelease transition.
+# On existing clusters the sub-apps are still managed by chart-operator via App/Chart CRs.
+# When this chart stops rendering the App CRs (they were replaced by HelmReleases), helm
+# would delete them and chart-operator would uninstall the running workloads. The pre-upgrade
+# hook below cordons those App CRs first so chart-operator leaves the underlying Helm releases
+# in place, allowing Flux to adopt them instead of reinstalling.
+# This hook is only needed while clusters are migrating; it can be disabled and removed once
+# every cluster has gone through a release containing it.
+migration:
+  appToHelmRelease:
+    enabled: true
+    # Image must provide a shell and kubectl. Defaults to the same image the tested
+    # cluster-chart migration hook (giantswarm/cluster#780) uses.
+    image: gsoci.azurecr.io/giantswarm/marctl:v4.24.2
+    # How long to keep the App CRs cordoned. Far-future date, matching the cluster chart.
+    cordonUntil: "2030-01-01"
+
 apps:
   gatewayApiCrds:
     appName: gateway-api-crds
@@ -21,7 +38,8 @@ apps:
     appName: envoy-gateway
     chartName: envoy-gateway
     catalog: giantswarm
-    dependsOn: gateway-api-crds
+    dependsOn:
+      - gateway-api-crds
     enabled: true
     namespace: envoy-gateway-system
     # used by renovate
@@ -37,7 +55,8 @@ apps:
     appName: gateway-api-config
     chartName: gateway-api-config
     catalog: giantswarm
-    dependsOn: envoy-gateway
+    dependsOn:
+      - envoy-gateway
     enabled: true
     namespace: envoy-gateway-system
     # used by renovate
@@ -53,7 +72,8 @@ apps:
     appName: envoy-ai-gateway
     chartName: envoy-ai-gateway
     catalog: giantswarm
-    dependsOn: gateway-api-crds
+    dependsOn:
+      - gateway-api-crds
     enabled: false
     namespace: envoy-ai-gateway-system
     # used by renovate
