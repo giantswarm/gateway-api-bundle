@@ -53,41 +53,21 @@ spec:
     remediation:
       retries: -1
       remediateLastFailure: false
-  {{- $hasExtraConfigs := gt (len (.extraConfigs | default list)) 0 }}
   {{- $hasUserConfigMap := false }}
   {{- $hasUserSecret := false }}
   {{- with .userConfig }}
   {{- if .configMap }}{{ $hasUserConfigMap = true }}{{ end }}
   {{- if .secret }}{{ $hasUserSecret = true }}{{ end }}
   {{- end }}
-  {{- if or $.Values.clusterID $hasExtraConfigs $hasUserConfigMap $hasUserSecret }}
+  {{- $clusterValuesConfigMap := "" }}
+  {{- if $.Values.clusterID }}{{ $clusterValuesConfigMap = printf "%s-cluster-values" $.Values.clusterID }}{{ end }}
+  {{- $userValuesConfigMap := "" }}
+  {{- if $hasUserConfigMap }}{{ $userValuesConfigMap = printf "%s-user-values" $appName }}{{ end }}
+  {{- $userValuesSecret := "" }}
+  {{- if $hasUserSecret }}{{ $userValuesSecret = printf "%s-user-secrets" $appName }}{{ end }}
+  {{- if or $clusterValuesConfigMap $userValuesConfigMap $userValuesSecret (gt (len (.extraConfigs | default list)) 0) }}
   valuesFrom:
-  {{- if $.Values.clusterID }}
-  - kind: ConfigMap
-    name: {{ $.Values.clusterID }}-cluster-values
-    valuesKey: values
-    optional: true
-  {{- end }}
-  {{- range $extraConfig := (.extraConfigs | default list) }}
-  {{- $kind := $extraConfig.kind }}
-  {{- if eq $kind "configMap" }}{{ $kind = "ConfigMap" }}{{ else if eq $kind "secret" }}{{ $kind = "Secret" }}{{ end }}
-  - kind: {{ $kind }}
-    name: {{ tpl $extraConfig.name $ }}
-    valuesKey: values
-    optional: false
-  {{- end }}
-  {{- if $hasUserConfigMap }}
-  - kind: ConfigMap
-    name: {{ $appName }}-user-values
-    valuesKey: values
-    optional: false
-  {{- end }}
-  {{- if $hasUserSecret }}
-  - kind: Secret
-    name: {{ $appName }}-user-secrets
-    valuesKey: values
-    optional: false
-  {{- end }}
+  {{- include "app.sortedValuesFrom" (dict "clusterValuesConfigMap" $clusterValuesConfigMap "userValuesConfigMap" $userValuesConfigMap "userValuesSecret" $userValuesSecret "extraConfigs" (.extraConfigs | default list) "root" $) | nindent 2 }}
   {{- end }}
 {{- with .userConfig }}
 {{- if ((.configMap).values) }}
