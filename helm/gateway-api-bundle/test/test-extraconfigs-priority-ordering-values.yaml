@@ -1,0 +1,37 @@
+# Test fixture exercising the priority-aware `valuesFrom` ordering
+# (app.sortedValuesFrom helper). Extra configs carry explicit priorities and
+# mixed kinds so `ct lint` renders the full ordering code path.
+#
+# Expected emitted order for gatewayApiConfig (ascending precedence — Flux
+# merges top-to-bottom, later wins; all configMaps before all secrets):
+#   1. extra-config-early        (ConfigMap, priority 10)
+#   2. test-cluster-values       (ConfigMap, platform slot 50)
+#   3. extra-config-mid          (ConfigMap, priority 75)
+#   4. test-gateway-api-config-user-values   (ConfigMap, platform slot 100)
+#   5. extra-config-override     (ConfigMap, priority 200)
+#   6. extra-secret-early        (Secret,    priority 30)
+#   7. test-gateway-api-config-user-secrets  (Secret, platform slot 100)
+clusterID: "test"
+
+apps:
+  gatewayApiConfig:
+    userConfig:
+      configMap:
+        values: |
+          some: user-value
+      secret:
+        values: |
+          some: user-secret
+    extraConfigs:
+      - name: extra-config-mid
+        kind: configMap
+        priority: 75
+      - name: extra-config-early
+        kind: configMap
+        priority: 10
+      - name: extra-config-override
+        kind: configMap
+        priority: 200
+      - name: extra-secret-early
+        kind: secret
+        priority: 30
