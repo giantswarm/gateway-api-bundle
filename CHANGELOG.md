@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.9.0 (#189)
+  - Changed: Update Envoy Gateway to [v1.8.3](https://gateway.envoyproxy.io/news/releases/notes/v1.8.3).
+  - Added: Set `karpenter.sh/do-not-disrupt: "true"` on the Envoy Gateway control-plane pods, so Karpenter does not voluntarily consolidate them. A control-plane reschedule forces the Envoy proxies to reconnect and can leave them wedged with stale/absent TLS secrets over delta xDS until restarted (see [envoyproxy/gateway#9519](https://github.com/envoyproxy/gateway/issues/9519)).
 - Migrate bundle's chart from `Apps` to `HelmReleases`.
 
 ## [1.18.0] - 2026-07-15
