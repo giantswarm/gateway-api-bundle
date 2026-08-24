@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added: For CAPA gateways using an AWS NLB, hold `/healthz` up for `shutdown.healthCheckFailureDelay: 30s` after drain starts, so the proxy stays ready until the NLB stops forwarding new flows to the node. Requires Envoy Gateway 1.9.
   - Changed: Shift the AWS NLB drain timers by the new health check failure delay: `shutdown.minDrainDuration` `150s` to `180s` and `shutdown.drainTimeout` `170s` to `200s`.
   - Fixed: Render partial `gateways` and `gatewayClasses` entries without nil-pointer errors, and drop the pruned `namespace` field from the `Gateway` `spec.infrastructure.parametersRef`.
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.10.1 (#199)
+  - Fixed: Point the `eg.image` fallback at the `gsoci.azurecr.io` mirror, so the control plane, certgen and `shutdownManager` images no longer resolve to a non-existent `docker.io/envoyproxy/gateway:<chart version>` tag when no image override is set.
+  - Fixed: Honour `global.imageRegistry` and `global.imagePullSecrets` in the CRD installer Job, so the `envoy-gateway-crds` image can be pulled from a private mirror.
 
 ## [1.19.0-rc.1] - 2026-08-20
 
