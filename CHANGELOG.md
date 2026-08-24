@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-08-24
+
+### Changed
+
+- This release aggregates all changes from release candidate 1.19.0-rc.1.
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.10.1 (#189, #195, #199)
+  - Changed: Update Envoy Gateway to [v1.9.0](https://gateway.envoyproxy.io/news/releases/notes/v1.9.0). Requires Gateway API v1.6 CRDs. Lua `EnvoyExtensionPolicy` is now opt-in via `config.envoyGateway.extensionApis.enableLua`, and `EndpointSliceIndex` is enabled by default, which can raise control plane memory usage.
+  - **Breaking:** Image registry overrides now use upstream's `global.imageRegistry` value instead of `global.image.registry`.
+  - Added: Set `karpenter.sh/do-not-disrupt: "true"` on the Envoy Gateway control-plane pods, so Karpenter does not voluntarily consolidate them. A control-plane reschedule forces the Envoy proxies to reconnect and can leave them wedged with stale/absent TLS secrets over delta xDS until restarted (see [envoyproxy/gateway#9519](https://github.com/envoyproxy/gateway/issues/9519)).
+  - Added: Configurable control plane startup, liveness and readiness probes.
+  - Fixed: Point the `eg.image` fallback at the `gsoci.azurecr.io` mirror, so the control plane, certgen and `shutdownManager` images no longer resolve to a non-existent `docker.io/envoyproxy/gateway:<chart version>` tag when no image override is set.
+  - Fixed: Honour `global.imageRegistry` and `global.imagePullSecrets` in the CRD installer Job, so the `envoy-gateway-crds` image can be pulled from a private mirror.
+- chore(deps): update dependency giantswarm/cloudwatch-exporter-app to v0.0.3 (#192)
+  - No functional changes.
+- chore(deps): update dependency giantswarm/gateway-api-crds-app to v1.9.1 (#193)
+  - Changed: Upgrade Gateway API CRDs to [v1.6.1](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.1) and Gateway API Inference Extension CRDs to [v1.5.0](https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/tag/v1.5.0). `tcproutes` and `udproutes` move to the `standard` channel, as required by Envoy Gateway 1.9.
+  - Changed: CRDs are applied by a `pre-install`/`pre-upgrade` hook Job using server-side apply instead of Helm templates. They are no longer Helm-managed, so `helm uninstall` leaves them in place and the rendered release fits in Helm's release Secret.
+  - Added: `safe-upgrades` `ValidatingAdmissionPolicy`, a `crds.image` override for the installer image, and a `CiliumNetworkPolicy` letting the installer Job reach the API server.
+  - Removed: alpha `InferencePool` CRD (`inference.networking.x-k8s.io/v1alpha2`), dropped upstream.
+- chore(deps): update dependency giantswarm/gateway-api-config-app to v1.11.2 (#197)
+  - Added: Tag AWS NLBs with the owning gateway name and namespace, and set `priorityClassName: giantswarm-critical` on the envoy proxy pods via the GatewayClass-level `EnvoyProxy`.
+  - Added: For CAPA gateways using an AWS NLB, hold `/healthz` up for `shutdown.healthCheckFailureDelay: 30s` after drain starts, so the proxy stays ready until the NLB stops forwarding new flows to the node. Requires Envoy Gateway 1.9.
+  - Changed: Shift the AWS NLB drain timers by the new health check failure delay: `shutdown.minDrainDuration` `150s` to `180s` and `shutdown.drainTimeout` `170s` to `200s`.
+  - Fixed: Render partial `gateways` and `gatewayClasses` entries without nil-pointer errors, and drop the pruned `namespace` field from the `Gateway` `spec.infrastructure.parametersRef`.
+
 ## [1.19.0-rc.1] - 2026-08-20
 
 ### Changed
@@ -320,7 +345,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.19.0-rc.1...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.19.0...HEAD
+[1.19.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.19.0-rc.1...v1.19.0
 [1.19.0-rc.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.18.0...v1.19.0-rc.1
 [1.18.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.17.1...v1.18.0
 [1.17.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.17.0...v1.17.1
