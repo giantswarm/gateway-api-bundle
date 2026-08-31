@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.19.1] - 2026-08-31
 
+### Changed
+
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.10.2 (#202)
+  - Removed: `karpenter.sh/do-not-disrupt` annotation on the Envoy Gateway control-plane pods.
+- chore(deps): update dependency giantswarm/cloudwatch-exporter-app to v0.0.4 (#204)
+  - Fixed: Do not override the chart `appVersion`.
+- chore(deps): update dependency giantswarm/gateway-api-config-app to v1.11.3 (#205)
+  - Removed: `karpenter.sh/do-not-disrupt` annotation on the envoy proxy pods.
+  - Added: E2E coverage on a cluster with mixed ASG and Karpenter node pools.
+
 ## [1.19.0] - 2026-08-24
 
 ### Changed
