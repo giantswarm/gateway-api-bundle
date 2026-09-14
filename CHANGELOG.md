@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Resolve the cluster's AWS account, OIDC domain and region from the crossplane config ConfigMap when not set in values.
+
 ## [1.19.2] - 2026-09-03
 
 ### Changed

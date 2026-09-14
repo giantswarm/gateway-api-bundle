@@ -1,7 +1,7 @@
 {{- with .Values.iamRoles.cloudwatchExporter }}
 {{- if .enabled }}
 {{- $roleName := include "app.name" (dict "app" "cloudwatch-exporter" "cluster" $.Values.clusterID) }}
-{{- $oidc := printf "irsa.%s.%s" $.Values.clusterID $.Values.aws.baseDomain }}
+{{- $oidc := include "aws.oidcDomain" $ }}
 ---
 apiVersion: iam.aws.upbound.io/v1beta1
 kind: Role
@@ -22,7 +22,7 @@ spec:
           {
             "Effect": "Allow",
             "Principal": {
-              "Federated": "arn:aws:iam::{{ $.Values.aws.accountID }}:oidc-provider/{{ $oidc }}"
+              "Federated": "arn:aws:iam::{{ include "aws.accountID" $ }}:oidc-provider/{{ $oidc }}"
             },
             "Action": "sts:AssumeRoleWithWebIdentity",
             "Condition": {

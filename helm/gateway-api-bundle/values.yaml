@@ -74,12 +74,12 @@ apps:
     # used by renovate
     # repo: giantswarm/cloudwatch-exporter-app
     version: 0.0.6
-    # Rendered against the release context via tpl; requires the aws.* values below.
+    # Rendered against the release context via tpl; resolves the aws.* values below.
     userConfig:
       configMap:
         values:
           clusterID: "{{ .Values.clusterID }}"
-          region: "{{ .Values.aws.region }}"
+          region: '{{ include "aws.region" . }}'
           serviceAccount:
             create: true
             name: yace
@@ -88,9 +88,14 @@ apps:
     extraConfigs: []
 
 # AWS context used to build IRSA trust policies for iamRoles (management-cluster side).
+# All values are optional overrides. When left empty they are read from the
+# <clusterID>-crossplane-config ConfigMap in the release namespace.
 aws:
   accountID: ""
-  # IRSA OIDC provider host is built as irsa.<clusterID>.<baseDomain>
+  # IRSA OIDC provider host, used verbatim.
+  oidcDomain: ""
+  # Legacy fallback, only used when oidcDomain resolves to nothing.
+  # The OIDC provider host is then built as irsa.<clusterID>.<baseDomain>
   baseDomain: ""
   region: ""
 
