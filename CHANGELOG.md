@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Remove the `envoyAIGateway` app from the bundle. Upstream Envoy AI Gateway has been renamed to [Agent Router](https://theagentrouter.ai/blog/envoy-ai-gateway-is-now-agent-router/) and moved to the AAIF; `giantswarm/envoy-ai-gateway-app` is being deprecated in favour of [agentgateway](https://github.com/giantswarm/agentgateway). The app was shipped with `enabled: false` and is not enabled on any cluster.
+
 ### Added
 
 - Chart metadata: add `io.giantswarm.application.managed` annotation (`"true"`).
