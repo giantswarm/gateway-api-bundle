@@ -53,7 +53,7 @@ See our [full reference on how to configure apps](https://docs.giantswarm.io/tut
 
 | Gateway API Bundle | Gateway API CRD App | Envoy Gateway App |
 | --- | --- | --- |
-| 1.19.x | 1.9.x (Gateway API v1.6.x) | 1.10.x (EnvoyGateway 1.9.x) |
+| 1.19.x - 1.20.x | 1.9.x (Gateway API v1.6.x) | 1.10.x (EnvoyGateway 1.9.x) |
 | 1.18.x | 1.8.x (Gateway API v1.5.x) | 1.8.x (EnvoyGateway 1.8.x) |
 | 1.16.x - 1.17.x | 1.8.x (Gateway API v1.5.x) | 1.7.x (EnvoyGateway 1.8.x) |
 | 1.13.x - 1.15.x | 1.6.x (Gateway API v1.4.x) | 1.6.x (EnvoyGateway 1.7.x) |
