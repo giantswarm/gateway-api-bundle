@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Resolve the cluster's AWS account, OIDC domain and region from the crossplane config ConfigMap when not set in values.
+- chore(deps): update dependency giantswarm/envoy-gateway-app to v1.10.4 (#220)
+  - Changed: Update Envoy Gateway to [v1.9.2](https://gateway.envoyproxy.io/news/releases/notes/v1.9.2).
+- chore(deps): update dependency giantswarm/gateway-api-config-app to v1.12.0 (#221)
+  - Added: Opt-in `clientTrafficPolicy.untrustedClientHeaders` to drop client-supplied identity headers such as `X-Forwarded-For` on CAPA gateways behind an AWS NLB.
+  - Added: Support chart-managed `ListenerSets` per gateway, each with its own certificate, DNS records and traffic policies.
+  - Changed: Gateway EnvoyProxy defaults no longer override settings made on the GatewayClass EnvoyProxy.
+  - Fixed: Fail rendering with a clear error when a listener certificate has no derivable DNS name.
+- chore(deps): update dependency giantswarm/cloudwatch-exporter-app to v0.0.6 (#211, #214)
+  - Changed: Update upstream chart to v0.47.0 (YACE v0.67.0).
 
 ## [1.19.2] - 2026-09-03
 
