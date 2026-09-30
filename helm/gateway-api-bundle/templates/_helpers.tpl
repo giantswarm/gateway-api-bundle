@@ -45,7 +45,7 @@ Params (dict):
   clusterValuesConfigMap  name of the <clusterID>-cluster-values ConfigMap (or "")
   userValuesConfigMap     name of the user-values ConfigMap (or "")
   userValuesSecret        name of the user-secrets Secret (or "")
-  extraConfigs            list of {name, kind, priority, optional}
+  extraConfigs            list of {name, namespace, kind, priority, optional}; namespace must be empty or the release namespace
   root                    $ (for tpl-ing extraConfig names)
 */}}
 {{- define "app.sortedValuesFrom" -}}
@@ -67,6 +67,9 @@ Params (dict):
 {{- $keys = append $keys $k -}}
 {{- end -}}
 {{- range $i, $extraConfig := (.extraConfigs | default list) -}}
+{{- if and $extraConfig.namespace (ne $extraConfig.namespace $.root.Release.Namespace) -}}
+{{- fail (printf "extraConfig %q is in namespace %q, but HelmRelease valuesFrom can only reference objects in %q" $extraConfig.name $extraConfig.namespace $.root.Release.Namespace) -}}
+{{- end -}}
 {{- $isSecret := $extraConfig.kind | default "configMap" | lower | eq "secret" -}}
 {{- $kindOrder := $isSecret | ternary "1" "0" -}}
 {{- $priority := $extraConfig.priority | default 25 | int -}}

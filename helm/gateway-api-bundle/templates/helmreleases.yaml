@@ -1,3 +1,7 @@
+{{- $enabledApps := dict }}
+{{- range .Values.apps }}
+{{- if .enabled }}{{ $_ := set $enabledApps .appName true }}{{ end }}
+{{- end }}
 {{- range $key, $value := .Values.apps }}
 {{- $appName := include "app.name" (dict "app" .appName "cluster" $.Values.clusterID "ns" $.Release.Namespace) }}
 {{- if and .enabled $appName }}
@@ -30,9 +34,13 @@ spec:
   chartRef:
     kind: OCIRepository
     name: {{ $appName }}
-  {{- if .dependsOn }}
+  {{- $deps := list }}
+  {{- range $dep := (kindIs "string" .dependsOn | ternary (list .dependsOn) (.dependsOn | default list)) }}
+  {{- if hasKey $enabledApps $dep }}{{ $deps = append $deps $dep }}{{ end }}
+  {{- end }}
+  {{- if $deps }}
   dependsOn:
-  {{- range $dep := .dependsOn }}
+  {{- range $dep := $deps }}
   - name: {{ $.Values.clusterID }}-{{ $dep }}
     namespace: {{ $.Release.Namespace }}
   {{- end }}
@@ -43,6 +51,7 @@ spec:
   interval: 5m
   timeout: {{ .timeout | default "10m" }}
   install:
+    createNamespace: true
     {{- if .skipCRDs }}
     crds: Skip
     {{- end }}

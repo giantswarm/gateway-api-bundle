@@ -84,7 +84,10 @@
                             "type": "string"
                         },
                         "dependsOn": {
-                            "type": "array",
+                            "type": [
+                                "array",
+                                "string"
+                            ],
                             "items": {
                                 "type": "string"
                             }
@@ -119,7 +122,10 @@
                             "type": "string"
                         },
                         "dependsOn": {
-                            "type": "array",
+                            "type": [
+                                "array",
+                                "string"
+                            ],
                             "items": {
                                 "type": "string"
                             }
@@ -154,7 +160,10 @@
                             "type": "string"
                         },
                         "dependsOn": {
-                            "type": "array",
+                            "type": [
+                                "array",
+                                "string"
+                            ],
                             "items": {
                                 "type": "string"
                             }
