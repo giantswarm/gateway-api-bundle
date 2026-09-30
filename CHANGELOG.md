@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.2] - 2026-09-30
+
 ## [1.20.1] - 2026-09-30
 
 ### Changed
@@ -419,7 +421,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.1...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.2...HEAD
+[1.20.2]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.1...v1.20.2
 [1.20.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.0...v1.20.1
 [1.20.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.0-rc.1...v1.20.0
 [1.20.0-rc.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.19.2...v1.20.0-rc.1
