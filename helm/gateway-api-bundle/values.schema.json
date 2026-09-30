@@ -71,44 +71,6 @@
                         }
                     }
                 },
-                "envoyAIGateway": {
-                    "type": "object",
-                    "properties": {
-                        "appName": {
-                            "type": "string"
-                        },
-                        "catalog": {
-                            "type": "string"
-                        },
-                        "chartName": {
-                            "type": "string"
-                        },
-                        "dependsOn": {
-                            "type": [
-                                "array",
-                                "string"
-                            ],
-                            "items": {
-                                "type": "string"
-                            }
-                        },
-                        "enabled": {
-                            "type": "boolean"
-                        },
-                        "extraConfigs": {
-                            "type": "array"
-                        },
-                        "namespace": {
-                            "type": "string"
-                        },
-                        "userConfig": {
-                            "type": "object"
-                        },
-                        "version": {
-                            "type": "string"
-                        }
-                    }
-                },
                 "envoyGateway": {
                     "type": "object",
                     "properties": {
@@ -223,6 +185,9 @@
                     "type": "string"
                 },
                 "baseDomain": {
+                    "type": "string"
+                },
+                "oidcDomain": {
                     "type": "string"
                 },
                 "region": {
