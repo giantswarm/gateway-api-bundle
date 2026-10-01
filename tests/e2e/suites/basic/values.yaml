@@ -1,3 +1,5 @@
+clusterID: "{{ .ClusterName }}"
+organization: "{{ .Organization }}"
 apps:
   gatewayApiCrds:
     enabled: true
