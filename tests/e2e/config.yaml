@@ -1,0 +1,5 @@
+appName: gateway-api-bundle
+repoName: gateway-api-bundle
+appCatalog: giantswarm
+providers:
+- capa

@@ -1,0 +1,7 @@
+apps:
+  gatewayApiCrds:
+    enabled: true
+  envoyGateway:
+    enabled: true
+  gatewayApiConfig:
+    enabled: true
