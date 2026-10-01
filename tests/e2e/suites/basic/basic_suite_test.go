@@ -30,19 +30,14 @@ func TestBasic(t *testing.T) {
 	suite.New().
 		WithIsUpgrade(isUpgrade).
 		WithValuesFile("./values.yaml").
-		AfterClusterReady(func() {
-			It("should configure the bundle to run on the management cluster", func() {
-				cluster := state.GetCluster()
-				app := state.GetApplication()
-
-				// The bundle renders HelmReleases on the MC that target the WC through its kubeconfig.
-				app.WithInCluster(true).WithInstallNamespace(cluster.Organization.GetNamespace())
-				app.Values = fmt.Sprintf("clusterID: %s\norganization: %s\n%s", cluster.Name, cluster.Organization.Name, app.Values)
-			})
-		}).
+		// The bundle renders its children on the MC, so it has to be installed in-cluster
+		// rather than through the workload cluster's kubeconfig.
+		WithHelmRelease(true).
+		WithHelmServiceAccountName("automation").
 		Tests(func() {
-			It("should have deployed the bundle app", func() {
-				Eventually(helmrelease.IsAppOrHelmReleaseReady(state.GetContext(), state.GetFramework().MC(), state.GetApplication().InstallName, state.GetCluster().Organization.GetNamespace())).
+			It("should have deployed the bundle HelmRelease", func() {
+				cluster := state.GetCluster()
+				Eventually(helmrelease.IsHelmReleaseReady(state.GetContext(), state.GetFramework().MC(), fmt.Sprintf("%s-gateway-api-bundle", cluster.Name), cluster.Organization.GetNamespace())).
 					WithTimeout(5 * time.Minute).
 					WithPolling(5 * time.Second).
 					Should(BeTrue())
@@ -59,8 +54,8 @@ func TestBasic(t *testing.T) {
 				}
 
 				Eventually(helmrelease.AreAllReady(state.GetContext(), state.GetFramework().MC(), children)).
-					WithTimeout(20 * time.Minute).
-					WithPolling(10 * time.Second).
+					WithTimeout(20*time.Minute).
+					WithPolling(10*time.Second).
 					Should(Succeed(), failurehandler.HelmReleasesNotReady(state.GetFramework(), cluster))
 			})
 		}).
