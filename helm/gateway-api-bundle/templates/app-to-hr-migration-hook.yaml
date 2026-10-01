@@ -1,0 +1,145 @@
+{{- /*
+App -> HelmRelease migration hook.
+
+Adapted from giantswarm/cluster#780's `app-to-hr-migration-hook`. Unlike the
+observability-bundle, gateway-api-bundle is not one of the cluster chart's
+default apps, so nothing upstream cordons its sub-apps during the migration.
+This bundle therefore has to carry its own hook.
+
+The hook runs as a `pre-upgrade` Helm hook: before helm applies the new
+revision (which no longer renders the sub-`App` CRs, only HelmReleases) it
+cordons those App CRs. Cordoning tells chart-operator to stop reconciling the
+underlying Chart/Helm release, so when helm deletes the now-unrendered App CRs
+the running workloads are left in place and Flux adopts the existing Helm
+releases instead of reinstalling them.
+
+Remove this hook (and the .Values.migration block) in a later release once every
+cluster has gone through a release containing it.
+*/}}
+{{- if .Values.migration.appToHelmRelease.enabled }}
+{{- $name := printf "%s-cordon-apps" .Release.Name | trunc 63 | trimSuffix "-" }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+- apiGroups:
+  - application.giantswarm.io
+  resources:
+  - apps
+  verbs:
+  - get
+  - list
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "-4"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "labels.common" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $name }}
+      restartPolicy: Never
+      containers:
+      - name: kubectl
+        image: {{ .Values.migration.appToHelmRelease.image }}
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: NAMESPACE
+          value: {{ .Release.Namespace | quote }}
+        - name: RELEASE
+          value: {{ .Release.Name | quote }}
+        - name: CLUSTER
+          value: {{ .Values.clusterID | quote }}
+        - name: CORDON_UNTIL
+          value: {{ .Values.migration.appToHelmRelease.cordonUntil | quote }}
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - |
+          set -o errexit -o nounset -o pipefail
+
+          echo "🚧 Cordoning App CRs in namespace '${NAMESPACE}' by selector 'giantswarm.io/managed-by=${RELEASE},giantswarm.io/cluster=${CLUSTER}' so chart-operator does not uninstall the workloads during the App to HelmRelease migration."
+          kubectl annotate apps.application.giantswarm.io \
+            --namespace "${NAMESPACE}" \
+            --selector "giantswarm.io/managed-by=${RELEASE},giantswarm.io/cluster=${CLUSTER}" \
+            chart-operator.giantswarm.io/cordon-reason="App to HelmRelease migration" \
+            chart-operator.giantswarm.io/cordon-until="${CORDON_UNTIL}" \
+            --overwrite
+          echo "🚧 Cordoned App CRs."
+
+          echo "💤 Waiting 30 seconds for operators to process the cordon."
+          sleep 30
+          echo "✅ Done."
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+  activeDeadlineSeconds: 300
+  backoffLimit: 5
+  ttlSecondsAfterFinished: 3600
+{{- end }}
