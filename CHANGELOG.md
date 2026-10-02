@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update architect to v10.12.0 (giantswarm/gateway-api-bundle#228)
+
 ## [1.20.2] - 2026-09-30
 - chore(deps): update dependency giantswarm/cloudwatch-exporter-app to v0.0.8
 
