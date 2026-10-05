@@ -56,11 +56,11 @@ spec:
     crds: Skip
     {{- end }}
     remediation:
-      retries: -1
+      retries: 3
       remediateLastFailure: false
   upgrade:
     remediation:
-      retries: -1
+      retries: 3
       remediateLastFailure: false
   {{- $hasUserConfigMap := false }}
   {{- $hasUserSecret := false }}
