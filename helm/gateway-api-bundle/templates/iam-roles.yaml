@@ -1,5 +1,5 @@
 {{- with .Values.iamRoles.cloudwatchExporter }}
-{{- if .enabled }}
+{{- if and $.Values.apps.cloudwatchExporter.enabled .enabled }}
 {{- $roleName := include "app.name" (dict "app" "cloudwatch-exporter" "cluster" $.Values.clusterID) }}
 {{- $oidc := include "aws.oidcDomain" $ }}
 ---

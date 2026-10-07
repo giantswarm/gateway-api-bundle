@@ -107,7 +107,8 @@ aws:
 # Full role name = <clusterID>-cloudwatch-exporter.
 iamRoles:
   cloudwatchExporter:
-    enabled: false
+    # The role is created when apps.cloudwatchExporter is enabled. Set to false to skip it.
+    enabled: true
     # Service account (namespace/name) on the workload cluster allowed to assume the role.
     namespace: envoy-gateway-system
     serviceAccount: yace
