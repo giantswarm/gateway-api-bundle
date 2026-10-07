@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update architect to v10.12.0 (giantswarm/gateway-api-bundle#228)
 - Migrate bundle's chart from `Apps` to `HelmReleases`. `extraConfigs` must now live in the bundle's namespace.
 - Limit `HelmRelease` install and upgrade remediation to 3 retries, so a broken release fails instead of retrying forever.
+- Create the cloudwatch-exporter IAM role whenever the cloudwatch-exporter app is enabled. It can still be disabled separately.
 
 ## [1.20.2] - 2026-09-30
 - chore(deps): update dependency giantswarm/cloudwatch-exporter-app to v0.0.8
