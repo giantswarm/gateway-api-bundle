@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Migrate bundle's chart from `Apps` to `HelmReleases`. `extraConfigs` must now live in the bundle's namespace.
 - Limit `HelmRelease` install and upgrade remediation to 3 retries, so a broken release fails instead of retrying forever.
 - Create the cloudwatch-exporter IAM role whenever the cloudwatch-exporter app is enabled. It can still be disabled separately.
+- chore(deps): update dependency giantswarm/gateway-api-config-app to [v1.13.0](https://github.com/giantswarm/gateway-api-config-app/releases/tag/v1.13.0) (#235)
+  - Changed: Upgrading restarts all Envoy proxy pods on CAPA, which now spread across zones by default (`ScheduleAnyway`). Turn off with `apps.gatewayApiConfig.userConfig.configMap.values.provider.aws.zoneSpread: false`.
+  - Changed: **Behaviour change:** the render fails if `service.beta.kubernetes.io/aws-load-balancer-subnets` has an empty entry or an empty value; fix the values before upgrading.
+  - Added: With NLB IP targets, `envoy-gateway-system` gets the AWS Load Balancer Controller pod readiness gate label.
 
 ## [1.20.2] - 2026-09-30
 - chore(deps): update dependency giantswarm/cloudwatch-exporter-app to v0.0.8
