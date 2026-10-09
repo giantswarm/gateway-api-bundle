@@ -14,7 +14,7 @@ migration:
     enabled: true
     # Image must provide a shell and kubectl. Defaults to the same image the tested
     # cluster-chart migration hook (giantswarm/cluster#780) uses.
-    image: gsoci.azurecr.io/giantswarm/marctl:v4.24.2
+    image: gsoci.azurecr.io/giantswarm/marctl:v5.3.0
     # How long to keep the App CRs cordoned. Far-future date, matching the cluster chart.
     cordonUntil: "2030-01-01"
 
