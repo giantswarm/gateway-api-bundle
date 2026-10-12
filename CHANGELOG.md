@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0-rc.1] - 2026-10-12
+
 ### Added
 
 - `pre-upgrade` migration hook that cordons the existing sub-`App` CRs before the `App` to `HelmRelease` switch, so chart-operator does not uninstall the running workloads and Flux can adopt the existing Helm releases. Gated by `migration.appToHelmRelease.enabled`; can be removed once all clusters have migrated.
@@ -437,7 +439,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.2...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.0.0-rc.1...HEAD
+[2.0.0-rc.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.2...v2.0.0-rc.1
 [1.20.2]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.1...v1.20.2
 [1.20.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.0...v1.20.1
 [1.20.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.0-rc.1...v1.20.0
