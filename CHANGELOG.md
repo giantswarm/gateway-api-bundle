@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-14
+
+### Added
+
+- `pre-upgrade` migration hook that cordons the existing sub-`App` CRs before the `App` to `HelmRelease` switch, so chart-operator does not uninstall the running workloads and Flux can adopt the existing Helm releases. Gated by `migration.appToHelmRelease.enabled`; can be removed once all clusters have migrated.
+
+### Changed
+
+- This release aggregates all changes from release candidate 2.0.0-rc.1.
+- Update architect to v10.12.0 (giantswarm/gateway-api-bundle#228)
+- Migrate bundle's chart from `Apps` to `HelmReleases`. `extraConfigs` must now live in the bundle's namespace.
+- Limit `HelmRelease` install and upgrade remediation to 3 retries, so a broken release fails instead of retrying forever.
+- Create the cloudwatch-exporter IAM role whenever the cloudwatch-exporter app is enabled. It can still be disabled separately.
+- chore(deps): update dependency giantswarm/gateway-api-config-app to [v1.13.0](https://github.com/giantswarm/gateway-api-config-app/releases/tag/v1.13.0) (#235)
+  - Changed: Upgrading restarts all Envoy proxy pods on CAPA, which now spread across zones by default (`ScheduleAnyway`). Turn off with `apps.gatewayApiConfig.userConfig.configMap.values.gateways.<name>.provider.aws.zoneSpread: false`.
+  - Changed: **Behaviour change:** the render fails if `service.beta.kubernetes.io/aws-load-balancer-subnets` has an empty entry or an empty value; fix the values before upgrading.
+  - Added: With NLB IP targets, `envoy-gateway-system` gets the AWS Load Balancer Controller pod readiness gate label.
+
 ## [2.0.0-rc.1] - 2026-10-12
 
 ### Added
@@ -439,7 +457,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.0.0-rc.1...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.0.0-rc.1...v2.0.0
 [2.0.0-rc.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.2...v2.0.0-rc.1
 [1.20.2]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.1...v1.20.2
 [1.20.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v1.20.0...v1.20.1
