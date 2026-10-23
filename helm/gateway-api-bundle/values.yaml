@@ -76,7 +76,7 @@ apps:
     namespace: envoy-gateway-system
     # used by renovate
     # repo: giantswarm/cloudwatch-exporter-app
-    version: 0.0.8
+    version: 0.0.10
     # Rendered against the release context via tpl; resolves the aws.* values below.
     userConfig:
       configMap:
