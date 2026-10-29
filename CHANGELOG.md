@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.1] - 2026-10-29
 
+### Changed
+
+- chore(deps): update dependency giantswarm/gateway-api-config-app to [v1.13.1](https://github.com/giantswarm/gateway-api-config-app/releases/tag/v1.13.1) (#265)
+  - Fixed: Gateway monitoring ClusterRoles render once instead of once per enabled GatewayClass, which broke installs through Flux HelmReleases.
+  - Added: `provider.aws.additionalResourceTags` adds AWS tags to a gateway NLB without replacing the owning-gateway tags.
+- chore(deps): update dependency giantswarm/cloudwatch-exporter-app to [v0.0.11](https://github.com/giantswarm/cloudwatch-exporter-app/releases/tag/v0.0.11) (#259)
+  - Fixed: `helm.sh/chart` label is valid for long chart versions.
+
 ### Fixed
 
 - The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
