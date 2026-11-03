@@ -44,7 +44,7 @@ apps:
     namespace: envoy-gateway-system
     # used by renovate
     # repo: giantswarm/envoy-gateway-app
-    version: 1.10.4
+    version: 1.10.5
     # User values can be provided via a ConfigMap or Secret for each individual app
     userConfig: {}
     # a list of extraConfigs for the App,
