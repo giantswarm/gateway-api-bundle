@@ -228,9 +228,6 @@
                         },
                         "image": {
                             "type": "string"
-                        },
-                        "cordonUntil": {
-                            "type": "string"
                         }
                     }
                 }

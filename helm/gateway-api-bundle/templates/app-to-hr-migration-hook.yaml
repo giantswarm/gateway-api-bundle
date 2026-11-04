@@ -1,98 +1,57 @@
 {{- /*
-App -> HelmRelease migration hook.
+App -> HelmRelease migration hooks.
 
-Adapted from giantswarm/cluster#780's `app-to-hr-migration-hook`. Unlike the
-observability-bundle, gateway-api-bundle is not one of the cluster chart's
-default apps, so nothing upstream cordons its sub-apps during the migration.
-This bundle therefore has to carry its own hook.
+Same approach as giantswarm/cluster's final App to HelmRelease migration. When
+this chart stops rendering the sub-App CRs, helm deletes them and app-operator
+deletes the matching Chart CRs in the workload cluster. Without protection,
+chart-operator then uninstalls the Helm releases and Flux installs them anew.
 
-The hook runs as a `pre-upgrade` Helm hook: before helm applies the new
-revision (which no longer renders the sub-`App` CRs, only HelmReleases) it
-cordons those App CRs. Cordoning tells chart-operator to stop reconciling the
-underlying Chart/Helm release, so when helm deletes the now-unrendered App CRs
-the running workloads are left in place and Flux adopts the existing Helm
-releases instead of reinstalling them.
+- pre-upgrade: pause the bundle's Chart CRs in the workload cluster
+  (`chart-operator.giantswarm.io/paused=true`). chart-operator skips paused
+  Chart CRs entirely, deletion included, and keeps their finalizer. The hook
+  fails if the pause cannot be applied, so helm never deletes the App CRs.
+- post-upgrade: wait for app-operator to delete those Chart CRs and remove
+  their finalizers, so they go away without chart-operator ever running
+  `helm uninstall`. Flux adopts the existing Helm releases.
 
-Remove this hook (and the .Values.migration block) in a later release once every
-cluster has gone through a release containing it.
+Both hooks are no-ops once no Chart CR of this bundle is left. Remove them (and
+the .Values.migration block) once every cluster has migrated.
 */}}
 {{- if .Values.migration.appToHelmRelease.enabled }}
-{{- $name := printf "%s-cordon-apps" .Release.Name | trunc 63 | trimSuffix "-" }}
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ $name }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-  annotations:
-    helm.sh/hook: pre-upgrade
-    helm.sh/hook-weight: "-5"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ $name }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-  annotations:
-    helm.sh/hook: pre-upgrade
-    helm.sh/hook-weight: "-5"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
-rules:
-- apiGroups:
-  - application.giantswarm.io
-  resources:
-  - apps
-  verbs:
-  - get
-  - list
-  - patch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ $name }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "labels.common" . | nindent 4 }}
-  annotations:
-    helm.sh/hook: pre-upgrade
-    helm.sh/hook-weight: "-4"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ $name }}
-subjects:
-- kind: ServiceAccount
-  name: {{ $name }}
-  namespace: {{ .Release.Namespace }}
+{{- range $hook := list "pre-upgrade" "post-upgrade" }}
+{{- $name := printf "%s-%s" $.Release.Name (eq $hook "pre-upgrade" | ternary "pause-charts" "release-charts") | trunc 63 | trimSuffix "-" }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ $name }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ $.Release.Namespace }}
   labels:
-    {{- include "labels.common" . | nindent 4 }}
+    {{- include "labels.common" $ | nindent 4 }}
   annotations:
-    helm.sh/hook: pre-upgrade
-    helm.sh/hook-weight: "0"
+    helm.sh/hook: {{ $hook }}
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
+  activeDeadlineSeconds: {{ eq $hook "pre-upgrade" | ternary 120 360 }}
+  backoffLimit: {{ eq $hook "pre-upgrade" | ternary 3 0 }}
+  ttlSecondsAfterFinished: 3600
   template:
     metadata:
       labels:
-        {{- include "labels.common" . | nindent 8 }}
+        {{- include "labels.common" $ | nindent 8 }}
     spec:
-      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: false
       restartPolicy: Never
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: {{ $.Values.clusterID }}-kubeconfig
+          items:
+          - key: value
+            path: kubeconfig
       containers:
       - name: kubectl
-        image: {{ .Values.migration.appToHelmRelease.image }}
+        image: {{ $.Values.migration.appToHelmRelease.image }}
         securityContext:
           runAsNonRoot: true
           runAsUser: 65534
@@ -104,15 +63,16 @@ spec:
             drop:
             - ALL
           readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: kubeconfig
+          subPath: kubeconfig
+          mountPath: /etc/kubeconfig
+          readOnly: true
         env:
-        - name: NAMESPACE
-          value: {{ .Release.Namespace | quote }}
-        - name: RELEASE
-          value: {{ .Release.Name | quote }}
-        - name: CLUSTER
-          value: {{ .Values.clusterID | quote }}
-        - name: CORDON_UNTIL
-          value: {{ .Values.migration.appToHelmRelease.cordonUntil | quote }}
+        - name: KUBECONFIG
+          value: /etc/kubeconfig
+        - name: SELECTOR
+          value: {{ printf "app.kubernetes.io/instance=%s,giantswarm.io/cluster=%s" $.Release.Name $.Values.clusterID | quote }}
         command:
         - /bin/sh
         args:
@@ -120,18 +80,58 @@ spec:
         - |
           set -o errexit -o nounset -o pipefail
 
-          echo "🚧 Cordoning App CRs in namespace '${NAMESPACE}' by selector 'giantswarm.io/managed-by=${RELEASE},giantswarm.io/cluster=${CLUSTER}' so chart-operator does not uninstall the workloads during the App to HelmRelease migration."
-          kubectl annotate apps.application.giantswarm.io \
-            --namespace "${NAMESPACE}" \
-            --selector "giantswarm.io/managed-by=${RELEASE},giantswarm.io/cluster=${CLUSTER}" \
-            chart-operator.giantswarm.io/cordon-reason="App to HelmRelease migration" \
-            chart-operator.giantswarm.io/cordon-until="${CORDON_UNTIL}" \
-            --overwrite
-          echo "🚧 Cordoned App CRs."
+          crd=$(kubectl get customresourcedefinitions.apiextensions.k8s.io charts.application.giantswarm.io --ignore-not-found --output name)
+          if [ -z "${crd}" ]; then
+            echo "✅ No Chart CRD in the workload cluster, nothing to do."
+            exit 0
+          fi
 
-          echo "💤 Waiting 30 seconds for operators to process the cordon."
-          sleep 30
-          echo "✅ Done."
+          list_charts() {
+            kubectl get charts.application.giantswarm.io --namespace giantswarm --selector "${SELECTOR}" \
+              --output jsonpath="{range .items[?($1)]}{.metadata.name}{'\n'}{end}"
+          }
+        {{- if eq $hook "pre-upgrade" }}
+
+          charts=$(list_charts "@.metadata.name")
+          if [ -z "${charts}" ]; then
+            echo "✅ No Chart CRs match '${SELECTOR}', nothing to pause."
+            exit 0
+          fi
+
+          echo "⏸️ Pausing Chart CRs so chart-operator does not uninstall them:" ${charts}
+          kubectl annotate charts.application.giantswarm.io --namespace giantswarm ${charts} \
+            chart-operator.giantswarm.io/paused=true --overwrite
+
+          paused=$(list_charts "@.metadata.annotations.chart-operator\.giantswarm\.io/paused=='true'")
+          if [ "${paused}" != "${charts}" ]; then
+            echo "❌ Not all Chart CRs are paused. Expected:" ${charts} "Paused:" ${paused}
+            exit 1
+          fi
+          echo "✅ All Chart CRs paused."
+        {{- else }}
+
+          deadline=$(( $(date +%s) + 300 ))
+          while :; do
+            terminating=$(list_charts "@.metadata.deletionTimestamp") || terminating=""
+            if [ -n "${terminating}" ]; then
+              echo "🧹 Removing finalizers from deleted Chart CRs:" ${terminating}
+              kubectl patch charts.application.giantswarm.io --namespace giantswarm ${terminating} \
+                --type merge --patch '{"metadata":{"finalizers":null}}' || :
+            fi
+
+            remaining=$(list_charts "@.metadata.name") || remaining="(unknown, listing failed)"
+            if [ -z "${remaining}" ]; then
+              echo "✅ No Chart CRs left."
+              exit 0
+            fi
+            if [ "$(date +%s)" -ge "${deadline}" ]; then
+              echo "⚠️ Chart CRs still present, left paused:" ${remaining}
+              echo "⚠️ The next upgrade of this release retries the cleanup."
+              exit 0
+            fi
+            sleep 10
+          done
+        {{- end }}
         resources:
           requests:
             cpu: 100m
@@ -139,7 +139,5 @@ spec:
           limits:
             cpu: 100m
             memory: 100Mi
-  activeDeadlineSeconds: 300
-  backoffLimit: 5
-  ttlSecondsAfterFinished: 3600
+{{- end }}
 {{- end }}
