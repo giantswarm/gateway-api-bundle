@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- App to HelmRelease migration no longer reinstalls the workloads: the hooks pause the workload cluster's Chart CRs and drop their finalizers once deleted, instead of cordoning the App CRs.
+
 ## [2.0.1] - 2026-10-29
 
 ### Changed
