@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.2] - 2026-11-04
 
+### Changed
+
+- chore(deps): update dependency giantswarm/envoy-gateway-app to [v1.10.5](https://github.com/giantswarm/envoy-gateway-app/releases/tag/v1.10.5) (#273)
+  - Changed: Envoy Gateway v1.9.3 and Envoy Proxy `distroless-v1.39.6` with CVE fixes and updated ca-certificates.
+
 ### Fixed
 
 - App to HelmRelease migration no longer reinstalls the workloads: the hooks pause the workload cluster's Chart CRs and drop their finalizers once deleted, instead of cordoning the App CRs.
