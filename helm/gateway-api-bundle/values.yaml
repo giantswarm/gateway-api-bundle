@@ -85,6 +85,32 @@ apps:
             # Routes the metrics to Mimir and names the owner.
             customLabels:
               application.giantswarm.io/team: cabbage
+            # The defaults of kube-state-metrics-app are sized for all built-in collectors.
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 128Mi
+            verticalPodAutoscaler:
+              minAllowed:
+                cpu: 10m
+                memory: 64Mi
+            networkPolicy:
+              # By port instead of the default private CIDRs: Cilium does not match
+              # cluster nodes, where the API server runs, with CIDR rules.
+              egress:
+                - ports:
+                    - port: 443
+                      protocol: TCP
+                    - port: 6443
+                      protocol: TCP
+              # Only the metrics port is scraped; the kubelet reaches the probes as
+              # host traffic.
+              ingress:
+                - ports:
+                    - port: 8080
+                      protocol: TCP
             rbac:
               extraRules:
                 - apiGroups: ["gateway.networking.k8s.io"]

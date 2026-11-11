@@ -2,7 +2,6 @@ package basic
 
 import (
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -38,10 +37,11 @@ const (
 // gatewayStateMetricsTests checks the gateway-api-state-metrics app: it runs, it is scraped by
 // a ServiceMonitor the observability platform picks up, and it exports the backends of an
 // HTTPRoute. The metrics are fetched from another pod, so the request passes the instance's
-// CiliumNetworkPolicy the same way a scrape does.
+// NetworkPolicy and the Service the same way a scrape does.
 func gatewayStateMetricsTests() {
 	wcName := state.GetCluster().Name
-	wcClient, _ := state.GetFramework().WC(wcName)
+	wcClient, err := state.GetFramework().WC(wcName)
+	Expect(err).NotTo(HaveOccurred())
 	ctx := state.GetContext()
 
 	By("checking Deployment " + stateMetricsName + " is ready")
@@ -70,7 +70,14 @@ func gatewayStateMetricsTests() {
 	Expect(serviceMonitor.GetLabels()).To(HaveKeyWithValue("application.giantswarm.io/team", "cabbage"))
 	selector, _, err := unstructured.NestedStringMap(serviceMonitor.Object, "spec", "selector", "matchLabels")
 	Expect(err).NotTo(HaveOccurred())
-	Expect(selector).To(Equal(stateMetricsSelector()))
+	for key, value := range stateMetricsSelector() {
+		Expect(selector).To(HaveKeyWithValue(key, value))
+	}
+	jobLabel, _, err := unstructured.NestedString(serviceMonitor.Object, "spec", "jobLabel")
+	Expect(err).NotTo(HaveOccurred())
+	// job="gateway-api-state-metrics" keeps the series apart from the kube-state-metrics of
+	// observability-bundle.
+	Expect(jobLabel).To(Equal("app.kubernetes.io/instance"))
 	endpoints, _, err := unstructured.NestedSlice(serviceMonitor.Object, "spec", "endpoints")
 	Expect(err).NotTo(HaveOccurred())
 	Expect(endpoints).To(HaveLen(1))
@@ -126,11 +133,7 @@ func gatewayStateMetricsTests() {
 		`backend1_weight="10"`,
 	}
 	Eventually(func() error {
-		podIP, err := readyStateMetricsPodIP()
-		if err != nil {
-			return err
-		}
-		url := "http://" + net.JoinHostPort(podIP, "8080") + "/metrics"
+		url := fmt.Sprintf("http://%s.%s.svc:8080/metrics", stateMetricsName, stateMetricsNamespace)
 		stdout, stderr, err := wcClient.ExecInPod(ctx, stateMetricsProbeName, stateMetricsNamespace, stateMetricsProbeName,
 			[]string{"wget", "-q", "-T", "10", "-O", "-", url})
 		if err != nil {
@@ -160,29 +163,6 @@ func stateMetricsSelector() map[string]string {
 		"app.kubernetes.io/name":     "kube-state-metrics",
 		"app.kubernetes.io/instance": stateMetricsName,
 	}
-}
-
-// readyStateMetricsPodIP returns the IP of a running, ready kube-state-metrics pod, skipping
-// pods that are terminating or left over from an earlier rollout.
-func readyStateMetricsPodIP() (string, error) {
-	wcClient, _ := state.GetFramework().WC(state.GetCluster().Name)
-	pods := &corev1.PodList{}
-	if err := wcClient.List(state.GetContext(), pods,
-		cr.InNamespace(stateMetricsNamespace),
-		cr.MatchingLabels(stateMetricsSelector())); err != nil {
-		return "", err
-	}
-	for _, pod := range pods.Items {
-		if pod.DeletionTimestamp != nil || pod.Status.Phase != corev1.PodRunning || pod.Status.PodIP == "" {
-			continue
-		}
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-				return pod.Status.PodIP, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("no ready pod of %s yet", stateMetricsName)
 }
 
 func stateMetricsRoute() *unstructured.Unstructured {

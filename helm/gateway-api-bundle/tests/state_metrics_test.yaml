@@ -64,6 +64,14 @@ tests:
       - matchRegex:
           path: data.values
           pattern: 'application.giantswarm.io/team: cabbage'
+      # Keeps the series apart from the kube-state-metrics of observability-bundle,
+      # which has job="kube-state-metrics".
+      - matchRegex:
+          path: data.values
+          pattern: 'jobLabel: app.kubernetes.io/instance'
+      - matchRegex:
+          path: data.values
+          pattern: 'port: 6443'
 
   - it: renders nothing for the app when disabled
     set:
