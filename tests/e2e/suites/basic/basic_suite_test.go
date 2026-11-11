@@ -26,6 +26,7 @@ var childApps = []string{
 	"gateway-api-crds",
 	"envoy-gateway",
 	"gateway-api-config",
+	"gateway-api-state-metrics",
 	"cloudwatch-exporter",
 }
 
@@ -75,6 +76,10 @@ func TestBasic(t *testing.T) {
 					WithTimeout(20*time.Minute).
 					WithPolling(10*time.Second).
 					Should(Succeed(), failurehandler.HelmReleasesNotReady(state.GetFramework(), cluster))
+			})
+
+			It("should export the HTTPRoute backends with gateway-api-state-metrics", func() {
+				gatewayStateMetricsTests()
 			})
 
 			It("should have the cloudwatch-exporter IAM role ready", func() {
