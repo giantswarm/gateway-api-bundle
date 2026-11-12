@@ -219,6 +219,9 @@
                                 }
                             }
                         },
+                        "valuesFile": {
+                            "type": "string"
+                        },
                         "version": {
                             "type": "string"
                         }

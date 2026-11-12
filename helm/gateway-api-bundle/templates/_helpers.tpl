@@ -27,7 +27,8 @@ entries win). The App platform instead merges by numeric priority and always
 lets secrets win over configMaps, so we emit entries in ascending precedence.
 
 Band order (lowest precedence first):
-  pre-cluster extras (priority < 50) -> cluster values (slot 50)
+  app defaults from valuesFile (slot 0)
+  -> pre-cluster extras (priority < 50) -> cluster values (slot 50)
   -> post-cluster extras (50..100)   -> user values (slot 100)
   -> post-user extras (priority > 100)
 and, independently, all configMaps sort before all secrets so secrets win.
@@ -42,6 +43,7 @@ Each entry is encoded as a sort key `KIND_PRIORITY_SOURCE_INDEX`:
 then sortAlpha the keys and emit. Returns a YAML array of valuesFrom entries.
 
 Params (dict):
+  defaultValuesConfigMap  name of the <app>-default-values ConfigMap rendered from valuesFile (or "")
   clusterValuesConfigMap  name of the <clusterID>-cluster-values ConfigMap (or "")
   userValuesConfigMap     name of the user-values ConfigMap (or "")
   userValuesSecret        name of the user-secrets Secret (or "")
@@ -51,6 +53,12 @@ Params (dict):
 {{- define "app.sortedValuesFrom" -}}
 {{- $keyed := dict -}}
 {{- $keys := list -}}
+{{- /* Defaults the bundle ships for the app (valuesFile), below every other source. */ -}}
+{{- if .defaultValuesConfigMap -}}
+{{- $k := "0_000_1_000" -}}
+{{- $keyed = set $keyed $k (dict "kind" "ConfigMap" "name" .defaultValuesConfigMap "valuesKey" "values" "optional" false) -}}
+{{- $keys = append $keys $k -}}
+{{- end -}}
 {{- if .clusterValuesConfigMap -}}
 {{- $k := "0_050_1_000" -}}
 {{- $keyed = set $keyed $k (dict "kind" "ConfigMap" "name" .clusterValuesConfigMap "valuesKey" "values" "optional" true) -}}

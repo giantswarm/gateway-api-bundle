@@ -68,16 +68,38 @@ spec:
   {{- if .configMap }}{{ $hasUserConfigMap = true }}{{ end }}
   {{- if .secret }}{{ $hasUserSecret = true }}{{ end }}
   {{- end }}
+  {{- $defaultValuesConfigMap := "" }}
+  {{- if .valuesFile }}{{ $defaultValuesConfigMap = printf "%s-default-values" $appName }}{{ end }}
   {{- $clusterValuesConfigMap := "" }}
   {{- if $.Values.clusterID }}{{ $clusterValuesConfigMap = printf "%s-cluster-values" $.Values.clusterID }}{{ end }}
   {{- $userValuesConfigMap := "" }}
   {{- if $hasUserConfigMap }}{{ $userValuesConfigMap = printf "%s-user-values" $appName }}{{ end }}
   {{- $userValuesSecret := "" }}
   {{- if $hasUserSecret }}{{ $userValuesSecret = printf "%s-user-secrets" $appName }}{{ end }}
-  {{- if or $clusterValuesConfigMap $userValuesConfigMap $userValuesSecret (gt (len (.extraConfigs | default list)) 0) }}
+  {{- if or $defaultValuesConfigMap $clusterValuesConfigMap $userValuesConfigMap $userValuesSecret (gt (len (.extraConfigs | default list)) 0) }}
   valuesFrom:
-  {{- include "app.sortedValuesFrom" (dict "clusterValuesConfigMap" $clusterValuesConfigMap "userValuesConfigMap" $userValuesConfigMap "userValuesSecret" $userValuesSecret "extraConfigs" (.extraConfigs | default list) "root" $) | nindent 2 }}
+  {{- include "app.sortedValuesFrom" (dict "defaultValuesConfigMap" $defaultValuesConfigMap "clusterValuesConfigMap" $clusterValuesConfigMap "userValuesConfigMap" $userValuesConfigMap "userValuesSecret" $userValuesSecret "extraConfigs" (.extraConfigs | default list) "root" $) | nindent 2 }}
   {{- end }}
+{{- with .valuesFile }}
+{{- $defaults := $.Files.Get . }}
+{{- if not $defaults }}
+{{- fail (printf "valuesFile %q of app %q is missing or empty in the chart" . $appName) }}
+{{- end }}
+{{- if hasKey ($defaults | fromYaml) "Error" }}
+{{- fail (printf "valuesFile %q of app %q is not valid YAML: %s" . $appName (get ($defaults | fromYaml) "Error")) }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "labels.common" $ | nindent 4 }}
+  name: {{ $appName }}-default-values
+  namespace: {{ $.Release.Namespace }}
+data:
+  values: |
+    {{- $defaults | nindent 4 }}
+{{- end }}
 {{- with .userConfig }}
 {{- if ((.configMap).values) }}
 ---
