@@ -69,7 +69,7 @@ apps:
     namespace: envoy-gateway-system
     # used by renovate
     # repo: giantswarm/kube-state-metrics-app
-    version: 0.0.0-r4c02ffect20261110222230hd17d4a1
+    version: 0.1.0
     # A kube-state-metrics instance for the Gateway API resources. It only exports custom
     # resources; the kube-state-metrics of observability-bundle covers everything else.
     # The config lives here, so it changes together with the Gateway API CRDs of the bundle.
@@ -82,6 +82,9 @@ apps:
             metricLabelsAllowlist: []
             extraArgs:
               - --custom-resource-state-only=true
+            # The telemetry endpoint is not scraped; only port 8080 is open.
+            selfMonitor:
+              enabled: false
             # Routes the metrics to Mimir and names the owner.
             customLabels:
               application.giantswarm.io/team: cabbage
@@ -97,16 +100,8 @@ apps:
                 cpu: 10m
                 memory: 64Mi
             networkPolicy:
-              # By port instead of the default private CIDRs: Cilium does not match
-              # cluster nodes, where the API server runs, with CIDR rules.
-              egress:
-                - ports:
-                    - port: 443
-                      protocol: TCP
-                    - port: 6443
-                      protocol: TCP
               # Only the metrics port is scraped; the kubelet reaches the probes as
-              # host traffic.
+              # host traffic. Egress to the API server comes from the chart defaults.
               ingress:
                 - ports:
                     - port: 8080

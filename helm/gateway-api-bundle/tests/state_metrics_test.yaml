@@ -71,7 +71,7 @@ tests:
           pattern: 'jobLabel: app.kubernetes.io/instance'
       - matchRegex:
           path: data.values
-          pattern: 'port: 6443'
+          pattern: 'selfMonitor:\s+enabled: false'
 
   - it: renders nothing for the app when disabled
     set:
