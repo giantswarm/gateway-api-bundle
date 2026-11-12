@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add a kube-state-metrics instance for the Gateway API resources as the `gateway-api-state-metrics` app, using the `kube-state-metrics` chart of kube-state-metrics-app. It only exports custom resources, so far the backends of each HTTPRoute rule as `gatewayapi_httproute_rule_backend_info`, with the first three `backendRefs` of the rule, the rule name and the type and value of its first path match as labels. Disable it with `apps.gatewayApiStateMetrics.enabled: false`.
+- Add `valuesFile` to the apps: a values file in the chart that the bundle renders into a `<cluster>-<app>-default-values` ConfigMap and passes to the HelmRelease first, so cluster and user values override it. `gateway-api-state-metrics` keeps its kube-state-metrics config there.
+
 ## [2.0.2] - 2026-11-04
 
 ### Changed

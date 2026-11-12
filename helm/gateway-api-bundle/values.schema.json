@@ -175,6 +175,57 @@
                             "type": "string"
                         }
                     }
+                },
+                "gatewayApiStateMetrics": {
+                    "type": "object",
+                    "properties": {
+                        "appName": {
+                            "type": "string"
+                        },
+                        "catalog": {
+                            "type": "string"
+                        },
+                        "chartName": {
+                            "type": "string"
+                        },
+                        "dependsOn": {
+                            "type": [
+                                "array",
+                                "string"
+                            ],
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "extraConfigs": {
+                            "type": "array"
+                        },
+                        "namespace": {
+                            "type": "string"
+                        },
+                        "userConfig": {
+                            "type": "object",
+                            "properties": {
+                                "configMap": {
+                                    "type": "object",
+                                    "properties": {
+                                        "values": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "valuesFile": {
+                            "type": "string"
+                        },
+                        "version": {
+                            "type": "string"
+                        }
+                    }
                 }
             }
         },

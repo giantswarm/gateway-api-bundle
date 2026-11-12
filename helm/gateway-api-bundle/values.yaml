@@ -59,6 +59,23 @@ apps:
     # It can be secret or configmap
     # https://github.com/giantswarm/rfc/tree/main/multi-layer-app-config#example
     extraConfigs: []
+  gatewayApiStateMetrics:
+    appName: gateway-api-state-metrics
+    chartName: kube-state-metrics
+    catalog: giantswarm
+    dependsOn:
+      - gateway-api-crds
+    enabled: true
+    namespace: envoy-gateway-system
+    # used by renovate
+    # repo: giantswarm/kube-state-metrics-app
+    version: 0.1.0
+    # valuesFile: a values file in this chart, passed to the HelmRelease before the cluster
+    # and user values. It is used as is, not templated. The kube-state-metrics config of
+    # this app is there.
+    valuesFile: files/gateway-api-state-metrics/values.yaml
+    userConfig: {}
+    extraConfigs: []
   cloudwatchExporter:
     appName: cloudwatch-exporter
     chartName: cloudwatch-exporter

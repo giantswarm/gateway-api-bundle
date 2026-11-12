@@ -7,5 +7,7 @@ apps:
     enabled: true
   gatewayApiConfig:
     enabled: true
+  gatewayApiStateMetrics:
+    enabled: true
   cloudwatchExporter:
     enabled: true
