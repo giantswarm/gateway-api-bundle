@@ -1,0 +1,37 @@
+workflows:
+  build:
+    jobs:
+    - architect/push-to-app-catalog:
+        executor: app-build-suite
+        context: architect
+        name: push-chart-control-plane-catalog
+        app_catalog: control-plane-catalog
+        app_catalog_test: control-plane-test-catalog
+        chart: gateway-api-bundle
+        attach_workspace: true
+        push_to_oci_registry: false
+        requires:
+        - pin-version
+        - build-chart
+        filters:
+          branches:
+            ignore:
+            - main
+            - /^release-v?[0-9]+(\.[0-9]+)?\.x$/
+    - architect/push-to-app-catalog:
+        executor: app-build-suite
+        context: architect
+        name: push-chart-release-control-plane-catalog
+        app_catalog: control-plane-catalog
+        app_catalog_test: control-plane-test-catalog
+        chart: gateway-api-bundle
+        attach_workspace: true
+        push_to_oci_registry: false
+        requires:
+        - pin-version
+        - build-chart
+        filters:
+          tags:
+            only: /^v.*/
+          branches:
+            ignore: /.*/
