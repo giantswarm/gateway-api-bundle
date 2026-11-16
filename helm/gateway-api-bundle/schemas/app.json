@@ -1,0 +1,97 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "appName": {
+            "type": "string"
+        },
+        "catalog": {
+            "type": "string"
+        },
+        "chartName": {
+            "type": "string"
+        },
+        "dependsOn": {
+            "type": [
+                "array",
+                "string"
+            ],
+            "items": {
+                "type": "string"
+            }
+        },
+        "enabled": {
+            "type": "boolean"
+        },
+        "extraConfigs": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "name"
+                ],
+                "properties": {
+                    "kind": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "namespace": {
+                        "type": "string"
+                    },
+                    "optional": {
+                        "type": "boolean"
+                    },
+                    "priority": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "namespace": {
+            "type": "string"
+        },
+        "skipCRDs": {
+            "type": "boolean"
+        },
+        "timeout": {
+            "type": "string"
+        },
+        "userConfig": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "configMap": {
+                    "$ref": "#/$defs/userValues"
+                },
+                "secret": {
+                    "$ref": "#/$defs/userValues"
+                }
+            }
+        },
+        "valuesFile": {
+            "type": "string"
+        },
+        "version": {
+            "type": "string"
+        }
+    },
+    "$defs": {
+        "userValues": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "values": {
+                    "type": [
+                        "object",
+                        "string"
+                    ],
+                    "additionalProperties": true
+                }
+            }
+        }
+    }
+}
