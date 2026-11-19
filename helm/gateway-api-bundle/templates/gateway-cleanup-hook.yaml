@@ -26,13 +26,25 @@ Known limits:
   uninstalls the bundle as an App, sets no timeout for it unless the App sets
   an uninstall timeout, and that must then be above timeoutSeconds + 60s.
 - Like any pre-delete hook, a Job that cannot run (image pull, quota, a
-  namespace that is already being deleted) fails the uninstall. To uninstall
-  without it, set cleanup.gatewayApiConfig.enabled to false in the App's user
-  values, let the App be upgraded, then delete it: hooks come from the
-  installed release, not from the values at delete time. Without the hook the
-  original hang can come back, and the GatewayClass finalizer then has to be
-  removed by hand. Removing the finalizer of the App or Chart CR instead skips
-  the uninstall entirely and leaves the HelmReleases running.
+  namespace that is already being deleted) fails the uninstall. Hooks come from
+  the installed release, not from the values at delete time, so:
+  - Before deleting the App: set cleanup.gatewayApiConfig.enabled to false in
+    its user values, let the App be upgraded, then delete it.
+  - Once the App is deleted, a values change is no longer applied. Do by hand
+    what the hook does, then uninstall without it:
+    1. `kubectl delete helmrelease -n <namespace> <cluster>-gateway-api-config
+       --wait`, while Envoy Gateway still runs.
+    2. `helm uninstall --no-hooks -n <namespace> <bundle release>`. chart-operator
+       then finds no release, drops the Chart CR finalizer, and app-operator
+       drops the App CR one.
+    Installed with Flux instead of as an App: step 1, then
+    spec.uninstall.disableHooks on the bundle HelmRelease.
+  - Removing the App and Chart CR finalizers instead skips the uninstall and
+    leaves everything the bundle rendered: HelmReleases, OCIRepositories, values
+    ConfigMaps and Secrets, the Crossplane IAM Role, the hook RBAC and the Helm
+    release secret. Only do that when helm cannot be run, and clean those up.
+  Without step 1 the original hang can come back, and the GatewayClass
+  finalizer then has to be removed by hand.
 - Upgrades are not covered: disabling envoy-gateway and gateway-api-config in
   one upgrade can still hang the same way.
 */}}
@@ -53,7 +65,8 @@ metadata:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
     # Helm only watches Jobs and Pods, so hook-failed never applies here. hook-succeeded removes
-    # the RBAC after the Job, and since Helm 3.21 also when the Job fails.
+    # the RBAC after the Job, and since Helm 3.21 also when the Job fails after it was created.
+    # If the Job cannot even be created, the RBAC stays until the next before-hook-creation.
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -115,7 +128,7 @@ metadata:
     # A failed Job stays for debugging, ttlSecondsAfterFinished removes it.
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
-  # The script ends within timeoutSeconds plus kubectl's 2s kill grace. The 60s on top
+  # The script ends at most about 5s after timeoutSeconds (kubectl kill grace). The 60s on top
   # also count scheduling and pulling the image, and catch a pod that never finishes.
   activeDeadlineSeconds: {{ add $cleanup.timeoutSeconds 60 }}
   backoffLimit: 0
@@ -207,6 +220,10 @@ spec:
 
           # Keep the error of the retries; the final check below writes its own.
           cp "${ERR}" "${ERR}.retries" 2>/dev/null || : > "${ERR}.retries"
+          if grep -qiE "doesn't have a resource type|no matches for kind" "${ERR}.retries"; then
+            echo "✅ No HelmRelease CRD in this cluster, nothing to clean up."
+            exit 0
+          fi
           if gone 8; then
             echo "✅ ${HR} is gone after $(elapsed)s."
             exit 0
@@ -214,7 +231,8 @@ spec:
           last_error "${ERR}.retries"
           echo "⚠️ ${HR} not gone after $(elapsed)s. Its conditions:"
           kt "$(upto "${end}" 5)" get "${HR}" --ignore-not-found \
-            --output jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}' || :
+            --output jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}' \
+            || last_error "${ERR}" || :
           echo "⚠️ If the uninstall waits on the GatewayClass finalizer, a Gateway that gateway-api-config did not create may still use the class."
           echo "⚠️ Continuing the uninstall anyway."
           exit 0
