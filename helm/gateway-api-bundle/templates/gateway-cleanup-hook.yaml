@@ -9,11 +9,18 @@ gateway-exists-finalizer.gateway.networking.k8s.io on a GatewayClass that has
 Gateways, and nothing else removes it: the gateway-api-config uninstall then
 hangs and the Envoy proxies keep running.
 
-This hook runs before helm deletes any HelmRelease. It deletes the Gateways of
-gateway-api-config, so Envoy Gateway deprovisions their proxies and drops the
-finalizer, then the GatewayClasses. It never blocks the uninstall: it exits 0
-when the workload cluster cannot be reached, when the Gateway API CRDs are
-missing, or when resources are still left at the deadline.
+This hook runs before helm deletes any HelmRelease:
+1. It deletes the Gateways of gateway-api-config in its namespace.
+2. It waits until Envoy Gateway has removed their proxies (Deployments,
+   DaemonSets, Services, so their load balancers too).
+3. It deletes the GatewayClasses of gateway-api-config, unless a Gateway that
+   gateway-api-config did not create still uses one: then the class is left.
+
+It never fails the uninstall: every API call has a request timeout, the whole
+run stays within timeoutSeconds, and it exits 0 when the workload cluster cannot
+be reached, the Gateway API CRDs are missing, or resources are still left at the
+deadline. Gateways it already deleted are not recreated if the uninstall then
+fails for another reason; the next upgrade of the bundle recreates them.
 */}}
 {{- $cleanup := .Values.cleanup.gatewayApiConfig }}
 {{- $config := .Values.apps.gatewayApiConfig }}
@@ -31,7 +38,8 @@ metadata:
     helm.sh/hook: pre-delete
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
-  activeDeadlineSeconds: {{ add $cleanup.timeoutSeconds 60 }}
+  # The script stops itself at timeoutSeconds; this only catches a hung pod.
+  activeDeadlineSeconds: {{ add $cleanup.timeoutSeconds 120 }}
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
   template:
@@ -70,8 +78,10 @@ spec:
         env:
         - name: KUBECONFIG
           value: /etc/kubeconfig-secret/kubeconfig
-        - name: SELECTOR
-          value: {{ printf "giantswarm.io/managed-by=%s" $config.appName | quote }}
+        - name: RELEASE
+          value: {{ $config.appName | quote }}
+        - name: NAMESPACE
+          value: {{ $config.namespace | quote }}
         - name: TIMEOUT
           value: {{ $cleanup.timeoutSeconds | quote }}
         command:
@@ -81,40 +91,97 @@ spec:
         - |
           set -o nounset
 
-          if [ ! -s "${KUBECONFIG}" ]; then
-            echo "✅ No workload cluster kubeconfig, nothing to clean up."
-            exit 0
-          fi
-          if ! kubectl version --request-timeout=15s >/dev/null 2>&1; then
-            echo "⚠️ Workload cluster not reachable, skipping the Gateway cleanup."
-            exit 0
-          fi
-          if [ -z "$(kubectl get customresourcedefinitions.apiextensions.k8s.io gatewayclasses.gateway.networking.k8s.io --ignore-not-found --output name)" ]; then
-            echo "✅ No Gateway API CRDs in the workload cluster, nothing to clean up."
-            exit 0
-          fi
-
+          SELECTOR="giantswarm.io/managed-by=${RELEASE}"
+          GATEWAYS=gateways.gateway.networking.k8s.io
+          CLASSES=gatewayclasses.gateway.networking.k8s.io
           deadline=$(( $(date +%s) + TIMEOUT ))
-          remaining() { echo $(( deadline - $(date +%s) > 0 ? deadline - $(date +%s) : 1 )); }
 
-          echo "🧹 Deleting Gateways matching '${SELECTOR}':"
-          kubectl get gateways.gateway.networking.k8s.io --all-namespaces --selector "${SELECTOR}" --no-headers --ignore-not-found || :
-          kubectl delete gateways.gateway.networking.k8s.io --all-namespaces --selector "${SELECTOR}" \
-            --ignore-not-found --wait --timeout "$(remaining)s" \
-            || echo "⚠️ Gateways not gone before the deadline."
+          k() { kubectl --request-timeout=15s "$@"; }
+          # Seconds left until the deadline, at least 1: `kubectl --timeout 0s` waits for a week.
+          remaining() { r=$(( deadline - $(date +%s) )); [ "${r}" -ge 1 ] || r=1; echo "${r}"; }
+          expired() { [ "$(date +%s)" -ge "${deadline}" ]; }
+          done_ok() { echo "✅ $*"; exit 0; }
+          give_up() { echo "⚠️ $*"; echo "⚠️ Continuing the uninstall anyway."; exit 0; }
 
-          echo "🧹 Deleting GatewayClasses matching '${SELECTOR}':"
-          kubectl get gatewayclasses.gateway.networking.k8s.io --selector "${SELECTOR}" --no-headers --ignore-not-found || :
-          if kubectl delete gatewayclasses.gateway.networking.k8s.io --selector "${SELECTOR}" \
-            --ignore-not-found --wait --timeout "$(remaining)s"; then
-            echo "✅ Gateways and GatewayClasses of gateway-api-config are gone."
-            exit 0
+          [ -s "${KUBECONFIG}" ] || done_ok "No workload cluster kubeconfig, nothing to clean up."
+          k version >/dev/null 2>&1 || give_up "Workload cluster not reachable, skipping the Gateway cleanup."
+
+          if ! crd=$(k get customresourcedefinitions.apiextensions.k8s.io "${CLASSES}" --ignore-not-found --output name); then
+            give_up "Could not look up the Gateway API CRDs."
+          fi
+          [ -n "${crd}" ] || done_ok "No Gateway API CRDs in the workload cluster, nothing to clean up."
+
+          if ! classes=$(k get "${CLASSES}" --selector "${SELECTOR}" --output jsonpath='{.items[*].metadata.name}'); then
+            give_up "Could not list the GatewayClasses matching '${SELECTOR}'."
+          fi
+          if ! gateways=$(k get "${GATEWAYS}" --namespace "${NAMESPACE}" --selector "${SELECTOR}" --output jsonpath='{.items[*].metadata.name}'); then
+            give_up "Could not list the Gateways matching '${SELECTOR}' in ${NAMESPACE}."
+          fi
+          # Gateways that gateway-api-config did not create but that use its GatewayClasses. While
+          # they exist, Envoy Gateway keeps the class finalizer (and a merged class proxy), so the
+          # classes are left alone.
+          foreign=""
+          if [ -n "${classes}" ]; then
+            if ! all=$(k get "${GATEWAYS}" --all-namespaces --output jsonpath='{range .items[*]}{.spec.gatewayClassName} {.metadata.namespace} {.metadata.name} {.metadata.labels.giantswarm\.io/managed-by}{"\n"}{end}'); then
+              give_up "Could not list Gateways."
+            fi
+            foreign=$(echo "${all}" | awk -v classes=" ${classes} " -v ns="${NAMESPACE}" -v rel="${RELEASE}" \
+              'NF >= 3 && index(classes, " " $1 " ") && !($2 == ns && $4 == rel) { print $2 "/" $3 }')
           fi
 
-          echo "⚠️ GatewayClasses still present. Gateways not created by gateway-api-config may still use them:"
-          kubectl get gateways.gateway.networking.k8s.io --all-namespaces --no-headers || :
-          echo "⚠️ Continuing the uninstall anyway."
-          exit 0
+          # 1. Gateways.
+          if [ -n "${gateways}" ]; then
+            echo "🧹 Deleting Gateways in ${NAMESPACE}:" ${gateways}
+            k delete "${GATEWAYS}" --namespace "${NAMESPACE}" ${gateways} --ignore-not-found --wait --timeout "$(remaining)s" \
+              || give_up "Gateways not gone before the deadline."
+          fi
+
+          # 2. Their proxies. Envoy Gateway removes them asynchronously, in its own namespace or the
+          # Gateway's, labelled with the owning Gateway, or with the GatewayClass when Gateways are merged.
+          proxy_selectors=""
+          [ -z "${gateways}" ] || proxy_selectors="gateway.envoyproxy.io/owning-gateway-namespace=${NAMESPACE},gateway.envoyproxy.io/owning-gateway-name in ($(echo ${gateways} | tr ' ' ','))"
+          if [ -n "${classes}" ] && [ -z "${foreign}" ]; then
+            proxy_selectors="${proxy_selectors}
+          gateway.envoyproxy.io/owning-gatewayclass in ($(echo ${classes} | tr ' ' ','))"
+          fi
+          if [ -n "${proxy_selectors}" ]; then
+            proxies_left=""
+            while IFS= read -r sel; do
+              [ -n "${sel}" ] || continue
+              while :; do
+                if left=$(k get deployments.apps,daemonsets.apps,services --all-namespaces --selector "${sel}" --output name); then
+                  [ -n "${left}" ] || break
+                else
+                  left="(listing failed)"
+                fi
+                if expired; then
+                  proxies_left="${proxies_left} ${left}"
+                  break
+                fi
+                echo "⏳ Waiting for Envoy Gateway to remove the proxies:" ${left}
+                sleep 5
+              done
+            done <<SELECTORS
+          ${proxy_selectors}
+          SELECTORS
+            if [ -n "${proxies_left}" ]; then
+              echo "⚠️ Envoy proxies still present at the deadline:" ${proxies_left}
+            else
+              echo "✅ Envoy proxies of ${RELEASE} removed."
+            fi
+          fi
+
+          # 3. GatewayClasses, unless a Gateway gateway-api-config did not create still uses one.
+          [ -n "${classes}" ] || done_ok "No GatewayClasses matching '${SELECTOR}'."
+          if [ -n "${foreign}" ]; then
+            give_up "Gateways not created by ${RELEASE} still use its GatewayClasses, leaving" ${classes}"." \
+              "Delete them for the uninstall of ${RELEASE} to finish:" ${foreign}
+          fi
+
+          echo "🧹 Deleting GatewayClasses:" ${classes}
+          k delete "${CLASSES}" ${classes} --ignore-not-found --wait --timeout "$(remaining)s" \
+            || give_up "GatewayClasses not gone before the deadline:" ${classes}
+          done_ok "Gateways and GatewayClasses of ${RELEASE} are gone."
         resources:
           requests:
             cpu: 100m

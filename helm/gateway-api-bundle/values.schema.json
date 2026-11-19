@@ -181,7 +181,8 @@
                             "type": "string"
                         },
                         "timeoutSeconds": {
-                            "type": "integer"
+                            "type": "integer",
+                            "minimum": 30
                         }
                     }
                 }

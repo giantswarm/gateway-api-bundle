@@ -16,9 +16,10 @@ cleanup:
   gatewayApiConfig:
     enabled: true
     image: gsoci.azurecr.io/giantswarm/docker-kubectl:1.37.2
-    # How long the hook waits for the Gateways and GatewayClasses to be gone before it lets
-    # the uninstall continue anyway.
-    timeoutSeconds: 300
+    # How long the hook waits for the Gateways, their Envoy proxies and the GatewayClasses to be
+    # gone before it lets the uninstall continue anyway. Keep it well below the uninstall timeout
+    # of the bundle (5m by default), or the hook itself fails the uninstall.
+    timeoutSeconds: 180  # @schema minimum: 30
 
 apps:  # @schema additionalProperties: true
   gatewayApiCrds:  # @schema $ref: schemas/app.json; skipProperties: true

@@ -1,0 +1,100 @@
+suite: gateway cleanup pre-delete hook
+templates:
+  - templates/gateway-cleanup-hook.yaml
+release:
+  name: test-gateway-api-bundle
+  namespace: org-test
+set:
+  clusterID: test
+tests:
+  - it: renders a pre-delete Job against the workload cluster
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.name
+          value: test-gateway-api-bundle-gateway-cleanup
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-delete
+      - equal:
+          path: spec.template.spec.volumes[0].secret
+          value:
+            secretName: test-kubeconfig
+            optional: true
+            items:
+              - key: value
+                path: kubeconfig
+
+  - it: targets the gateway-api-config release and namespace
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RELEASE
+            value: gateway-api-config
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NAMESPACE
+            value: envoy-gateway-system
+
+  - it: follows a renamed gateway-api-config app
+    set:
+      apps.gatewayApiConfig.appName: my-gateways
+      apps.gatewayApiConfig.namespace: gateways
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RELEASE
+            value: my-gateways
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NAMESPACE
+            value: gateways
+
+  - it: stops itself at timeoutSeconds, the Job deadline is only a backstop
+    set:
+      cleanup.gatewayApiConfig.timeoutSeconds: 60
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TIMEOUT
+            value: "60"
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 180
+
+  - it: truncates the Job name to 63 characters
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^.{1,63}$
+
+  - it: is not rendered when disabled
+    set:
+      cleanup.gatewayApiConfig.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: is not rendered without gateway-api-config
+    set:
+      apps.gatewayApiConfig.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: is not rendered without envoy-gateway
+    set:
+      apps.envoyGateway.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
