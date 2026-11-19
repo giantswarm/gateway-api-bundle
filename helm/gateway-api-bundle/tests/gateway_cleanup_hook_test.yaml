@@ -98,3 +98,23 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: ends before the default 5m uninstall timeout at the largest timeoutSeconds
+    set:
+      cleanup.gatewayApiConfig.timeoutSeconds: 200
+    asserts:
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 260
+
+  - it: rejects a timeoutSeconds above 200
+    set:
+      cleanup.gatewayApiConfig.timeoutSeconds: 201
+    asserts:
+      - failedTemplate: {}
+
+  - it: rejects a timeoutSeconds below 30
+    set:
+      cleanup.gatewayApiConfig.timeoutSeconds: 29
+    asserts:
+      - failedTemplate: {}

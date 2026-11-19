@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Deleting the bundle no longer hangs on the `gateway-exists-finalizer` of the GatewayClass. Flux only honours `dependsOn` on install and upgrade, so `envoy-gateway` could be uninstalled before `gateway-api-config`. A `pre-delete` hook now deletes the Gateways of `gateway-api-config`, waits for Envoy Gateway to remove their proxies and load balancers, then deletes its GatewayClasses. It leaves a GatewayClass alone while Gateways that `gateway-api-config` did not create still use it, and it never fails the uninstall. Tune it with `cleanup.gatewayApiConfig.timeoutSeconds` (default 180) or disable it with `cleanup.gatewayApiConfig.enabled: false`.
+- Deleting the bundle no longer hangs on the `gateway-exists-finalizer` of the GatewayClass. Flux only honours `dependsOn` on install and upgrade, so `envoy-gateway` could be uninstalled before `gateway-api-config`. A `pre-delete` hook now deletes the Gateways of `gateway-api-config`, waits for Envoy Gateway to remove their proxies and load balancers, then deletes its GatewayClasses. It leaves a GatewayClass alone while Gateways that `gateway-api-config` did not create still use it, and it does not fail the uninstall when the workload cluster is unreachable or resources are left at its deadline. Tune it with `cleanup.gatewayApiConfig.timeoutSeconds` (default 180, at most 200, so the hook ends within the default 5m uninstall timeout) or disable it with `cleanup.gatewayApiConfig.enabled: false`.
 
 ## [2.1.0] - 2026-11-17
 

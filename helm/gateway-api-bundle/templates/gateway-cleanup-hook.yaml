@@ -16,8 +16,8 @@ This hook runs before helm deletes any HelmRelease:
 3. It deletes the GatewayClasses of gateway-api-config, except a class that a
    Gateway gateway-api-config did not create still uses: that one is left.
 
-It does not fail the uninstall on workload cluster conditions: API calls have a
-request timeout, the run stays within timeoutSeconds, and it exits 0 when the
+It does not fail the uninstall on workload cluster conditions: every API call
+ends by the deadline, the run stays within timeoutSeconds, and it exits 0 when the
 workload cluster cannot be reached, the Gateway API CRDs are missing, or
 resources are still left at the deadline. The Job deadline fires before the
 default 5m uninstall timeout, so a pod that never starts fails the hook instead
@@ -103,10 +103,14 @@ spec:
           CLASSES=gatewayclasses.gateway.networking.k8s.io
           deadline=$(( $(date +%s) + TIMEOUT ))
 
-          k() { kubectl --request-timeout=15s "$@"; }
           # Seconds left until the deadline, at least 1: `kubectl --timeout 0s` waits for a week.
           remaining() { r=$(( deadline - $(date +%s) )); [ "${r}" -ge 1 ] || r=1; echo "${r}"; }
           expired() { [ "$(date +%s)" -ge "${deadline}" ]; }
+          # Every API call ends by the deadline, so the run overruns timeoutSeconds by a few
+          # seconds at most and the Job's 60s margin is left for starting the pod.
+          k() { t=$(remaining); [ "${t}" -le 15 ] || t=15; kubectl --request-timeout="${t}s" "$@"; }
+          # delete --wait: the request timeout also bounds the watch, so it gets all the time left.
+          del() { t=$(remaining); kubectl delete "$@" --ignore-not-found --wait --timeout "${t}s" --request-timeout="${t}s"; }
           done_ok() { echo "✅ $*"; exit 0; }
           give_up() { echo "⚠️ $*"; echo "⚠️ Continuing the uninstall anyway."; exit 0; }
 
@@ -145,12 +149,10 @@ spec:
             fi
           done
 
-          # `delete --wait` runs without --request-timeout, which would also cut its watch;
-          # --timeout bounds it.
           # 1. Gateways.
           if [ -n "${gateways}" ]; then
             echo "🧹 Deleting Gateways in ${NAMESPACE}:" ${gateways}
-            kubectl delete "${GATEWAYS}" --namespace "${NAMESPACE}" ${gateways} --ignore-not-found --wait --timeout "$(remaining)s" \
+            del "${GATEWAYS}" --namespace "${NAMESPACE}" ${gateways} \
               || give_up "Gateways not gone before the deadline."
           fi
 
@@ -169,13 +171,14 @@ spec:
                 return 0
               fi
               echo "⏳ Waiting for Envoy Gateway to remove the proxies:" ${left}
-              sleep 5
+              s=$(remaining); [ "${s}" -le 5 ] || s=5
+              sleep "${s}"
             done
           }
           if [ -n "${gateways}" ]; then
             wait_gone "gateway.envoyproxy.io/owning-gateway-namespace=${NAMESPACE},gateway.envoyproxy.io/owning-gateway-name in ($(echo ${gateways} | tr ' ' ','))"
           fi
-          if [ -n "${free_classes}" ]; then
+          if [ -n "${free_classes}" ] && ! expired; then
             wait_gone "gateway.envoyproxy.io/owning-gatewayclass in ($(echo ${free_classes} | tr ' ' ','))"
           fi
           if [ -n "${proxies_left}" ]; then
@@ -186,16 +189,18 @@ spec:
 
           # 3. GatewayClasses that no Gateway from outside gateway-api-config uses.
           [ -n "${classes}" ] || done_ok "No GatewayClasses matching '${SELECTOR}'."
-          if [ -n "${free_classes}" ]; then
-            echo "🧹 Deleting GatewayClasses:" ${free_classes}
-            kubectl delete "${CLASSES}" ${free_classes} --ignore-not-found --wait --timeout "$(remaining)s" \
-              || give_up "GatewayClasses not gone before the deadline:" ${free_classes}
-          fi
           if [ -n "${kept_classes}" ]; then
             foreign_gateways=$(echo "${foreign}" | awk '{ print $2 }')
-            give_up "Leaving GatewayClasses" ${kept_classes}", Gateways not created by ${RELEASE} still use them." \
+            echo "⚠️ Leaving GatewayClasses" ${kept_classes}", Gateways not created by ${RELEASE} still use them." \
               "Delete them for the uninstall of ${RELEASE} to finish:" ${foreign_gateways}
           fi
+          if [ -n "${free_classes}" ]; then
+            ! expired || give_up "Deadline reached, GatewayClasses not deleted:" ${free_classes}
+            echo "🧹 Deleting GatewayClasses:" ${free_classes}
+            del "${CLASSES}" ${free_classes} \
+              || give_up "GatewayClasses not gone before the deadline:" ${free_classes}
+          fi
+          [ -z "${kept_classes}" ] || give_up "GatewayClasses left:" ${kept_classes}
           done_ok "Gateways and GatewayClasses of ${RELEASE} are gone."
         resources:
           requests:
