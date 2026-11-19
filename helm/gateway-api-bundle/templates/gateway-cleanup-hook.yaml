@@ -14,8 +14,9 @@ is gone, so Flux uninstalls the chart while Envoy Gateway can still remove its
 proxies and the GatewayClass finalizer. It does not touch the workload cluster
 itself.
 
-It retries on API errors, never waits longer than timeoutSeconds and always
-exits 0, so the bundle uninstall goes on even when gateway-api-config cannot be
+It retries on API errors that can clear, stops early on errors that cannot (an
+admission denial, a missing HelmRelease CRD), ends within timeoutSeconds and
+always exits 0, so the bundle uninstall goes on even when gateway-api-config cannot be
 uninstalled in time. That happens when a Gateway that gateway-api-config did not
 create still uses its GatewayClass, or when the workload cluster is unreachable
 while its kubeconfig secret still exists.
@@ -26,8 +27,12 @@ Known limits:
   an uninstall timeout, and that must then be above timeoutSeconds + 60s.
 - Like any pre-delete hook, a Job that cannot run (image pull, quota, a
   namespace that is already being deleted) fails the uninstall. To uninstall
-  without it: `helm uninstall --no-hooks`, or remove the finalizer of the
-  bundle's App/Chart CR.
+  without it, set cleanup.gatewayApiConfig.enabled to false in the App's user
+  values, let the App be upgraded, then delete it: hooks come from the
+  installed release, not from the values at delete time. Without the hook the
+  original hang can come back, and the GatewayClass finalizer then has to be
+  removed by hand. Removing the finalizer of the App or Chart CR instead skips
+  the uninstall entirely and leaves the HelmReleases running.
 - Upgrades are not covered: disabling envoy-gateway and gateway-api-config in
   one upgrade can still hang the same way.
 */}}
@@ -47,8 +52,9 @@ metadata:
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
-    # hook-failed too: a ServiceAccount that can delete the HelmRelease must not stay behind.
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
+    # Helm only watches Jobs and Pods, so hook-failed never applies here. hook-succeeded removes
+    # the RBAC after the Job, and since Helm 3.21 also when the Job fails.
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -60,7 +66,7 @@ metadata:
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 rules:
 # Only the gateway-api-config HelmRelease of this cluster. kubectl delete and kubectl wait
 # read it by name and watch it with a metadata.name field selector, which resourceNames allows.
@@ -86,7 +92,7 @@ metadata:
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -109,8 +115,8 @@ metadata:
     # A failed Job stays for debugging, ttlSecondsAfterFinished removes it.
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
-  # The script stops itself at timeoutSeconds; this only catches a pod that never
-  # finishes.
+  # The script ends within timeoutSeconds plus kubectl's 2s kill grace. The 60s on top
+  # also count scheduling and pulling the image, and catch a pod that never finishes.
   activeDeadlineSeconds: {{ add $cleanup.timeoutSeconds 60 }}
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
@@ -160,36 +166,54 @@ spec:
           set -o nounset
 
           HR="helmreleases.helm.toolkit.fluxcd.io/${HELMRELEASE}"
+          ERR=/tmp/kubectl.err
           start=$(date +%s)
-          deadline=$(( start + TIMEOUT ))
+          end=$(( start + TIMEOUT ))
+          # Retrying stops 10s before the end, so the final check keeps its own budget.
+          retry_end=$(( end - 10 ))
 
-          # Seconds left, at least 1 (`kubectl --timeout 0s` waits for a week), at most $1.
-          left() { r=$(( deadline - $(date +%s) )); [ "${r}" -ge 1 ] || r=1; [ "${r}" -le "$1" ] || r=$1; echo "${r}"; }
-          expired() { [ "$(date +%s)" -ge "${deadline}" ]; }
+          # Seconds until $1, at least 1 (`kubectl --timeout 0s` waits for a week), at most $2.
+          upto() { r=$(( $1 - $(date +%s) )); [ "${r}" -ge 1 ] || r=1; [ "${r}" -le "$2" ] || r=$2; echo "${r}"; }
+          elapsed() { echo $(( $(date +%s) - start )); }
           # busybox timeout kills kubectl at the deadline: --timeout only bounds the wait,
           # not the requests before it.
-          kt() { t=$1; shift; timeout -k 2 "${t}" kubectl --namespace "${NAMESPACE}" "$@"; }
+          kt() { t=$1; shift; timeout -k 2 "${t}" kubectl --namespace "${NAMESPACE}" "$@" 2>"${ERR}"; }
           # True only when a successful read finds no HelmRelease; a failed read is not "gone".
-          gone() { out=$(kt "$(left 15)" get "${HR}" --ignore-not-found --output name) && [ -z "${out}" ]; }
+          gone() { out=$(kt "$(upto "${end}" "$1")" get "${HR}" --ignore-not-found --output name) && [ -z "${out}" ]; }
+          # Errors that a retry cannot clear.
+          permanent() { grep -qiE "denied the request|admission webhook|doesn't have a resource type|no matches for kind" "${ERR}" 2>/dev/null; }
+          last_error() { [ -s "$1" ] && echo "⚠️ Last error: $(tail -n 1 "$1")"; }
 
           echo "🧹 Deleting ${HR} in ${NAMESPACE} and waiting for Flux to uninstall it."
-          # Retry until the deadline: an API error or an authorizer that does not see the new
-          # RoleBinding yet must not skip the cleanup.
-          while :; do
-            if kt "$(left 15)" delete "${HR}" --ignore-not-found --wait=false >/dev/null; then
-              t=$(left "${TIMEOUT}")
-              if kt "${t}" wait "${HR}" --for=delete --timeout "${t}s" >/dev/null 2>&1 || gone; then
-                echo "✅ ${HR} is gone after $(( $(date +%s) - start ))s."
+          # Retry: an API error or an authorizer that does not see the new RoleBinding yet must
+          # not skip the cleanup.
+          deleted=""
+          while [ "$(date +%s)" -lt "${retry_end}" ]; do
+            if [ -z "${deleted}" ] && kt "$(upto "${retry_end}" 15)" delete "${HR}" --ignore-not-found --wait=false >/dev/null; then
+              deleted=1
+            fi
+            if [ -n "${deleted}" ]; then
+              t=$(upto "${retry_end}" "${TIMEOUT}")
+              if kt "${t}" wait "${HR}" --for=delete --timeout "${t}s" >/dev/null; then
+                echo "✅ ${HR} is gone after $(elapsed)s."
                 exit 0
               fi
             fi
-            expired && break
+            permanent && break
+            [ "$(date +%s)" -lt "${retry_end}" ] || break
             echo "⏳ Retrying."
-            sleep "$(left 5)"
+            sleep "$(upto "${retry_end}" 5)"
           done
 
-          echo "⚠️ ${HR} not gone after $(( $(date +%s) - start ))s. Its conditions:"
-          timeout -k 2 15 kubectl get "${HR}" --namespace "${NAMESPACE}" --ignore-not-found \
+          # Keep the error of the retries; the final check below writes its own.
+          cp "${ERR}" "${ERR}.retries" 2>/dev/null || : > "${ERR}.retries"
+          if gone 8; then
+            echo "✅ ${HR} is gone after $(elapsed)s."
+            exit 0
+          fi
+          last_error "${ERR}.retries"
+          echo "⚠️ ${HR} not gone after $(elapsed)s. Its conditions:"
+          kt "$(upto "${end}" 5)" get "${HR}" --ignore-not-found \
             --output jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}' || :
           echo "⚠️ If the uninstall waits on the GatewayClass finalizer, a Gateway that gateway-api-config did not create may still use the class."
           echo "⚠️ Continuing the uninstall anyway."

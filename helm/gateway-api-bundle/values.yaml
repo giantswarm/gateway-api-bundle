@@ -19,6 +19,7 @@ cleanup:
     # How long the hook waits for the gateway-api-config HelmRelease to be gone before it lets the
     # uninstall continue anyway. The bundle uninstall waits for it: chart-operator handles one App
     # at a time, so keep it short. An App uninstall timeout, if set, must be above it + 60s.
+    # At most 200, so the hook also ends within the 5m default uninstall timeout of Flux and helm.
     timeoutSeconds: 120  # @schema minimum: 30; maximum: 200
 
 apps:  # @schema additionalProperties: true

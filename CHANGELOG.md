@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Deleting the bundle no longer hangs on the `gateway-exists-finalizer` of the GatewayClass. Flux only honours `dependsOn` on install and upgrade, so `envoy-gateway` could be uninstalled before `gateway-api-config`. A `pre-delete` hook now deletes the `gateway-api-config` HelmRelease and waits for Flux to uninstall it while Envoy Gateway still runs. It lets the uninstall go on when that takes longer than `cleanup.gatewayApiConfig.timeoutSeconds` (default 120, at most 200). If the hook cannot run at all, `helm uninstall --no-hooks` or removing the finalizer of the bundle's App/Chart CR uninstalls without it. Disable it with `cleanup.gatewayApiConfig.enabled: false`.
+- Deleting the bundle no longer hangs on the `gateway-exists-finalizer` of the GatewayClass. Flux only honours `dependsOn` on install and upgrade, so `envoy-gateway` could be uninstalled before `gateway-api-config`. A `pre-delete` hook now deletes the `gateway-api-config` HelmRelease and waits for Flux to uninstall it while Envoy Gateway still runs. It lets the uninstall go on when that takes longer than `cleanup.gatewayApiConfig.timeoutSeconds` (default 120, at most 200). If the hook cannot run at all, set `cleanup.gatewayApiConfig.enabled: false` in the App's user values, let the App be upgraded, then delete it. Disable it with `cleanup.gatewayApiConfig.enabled: false`.
 
 ## [2.1.0] - 2026-11-17
 
