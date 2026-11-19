@@ -91,6 +91,9 @@ tests:
       - equal:
           path: spec.template.spec.serviceAccountName
           value: test-gateway-api-bundle-gateway-cleanup
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: gateway-cleanup
       - contains:
           path: spec.template.spec.containers[0].env
           content:
