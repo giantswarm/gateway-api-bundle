@@ -208,6 +208,8 @@ spec:
           # busybox timeout kills kubectl at the deadline: --timeout only bounds the wait,
           # not the requests before it.
           kt() { t=$1; shift; timeout -k 2 "${t}" kubectl --namespace "${NAMESPACE}" "$@" 2>"${ERR}"; }
+          # Why the last kt call failed. When timeout kills kubectl, ERR is empty or says "Terminated".
+          why() { e=$(tail -n 1 "${ERR}" 2>/dev/null); [ -n "${e}" ] && [ "${e}" != Terminated ] && echo "${e}" || echo "no answer within $1s"; }
           last_error() { [ -s "${ERR}" ] && echo "❌ Last error: $(tail -n 1 "${ERR}")"; }
           NO_CRD="doesn't have a resource type|no matches for kind"
           # Admission webhooks and ValidatingAdmissionPolicies.
@@ -259,7 +261,7 @@ spec:
             echo "❌ ${HR} not gone after $(elapsed)s. Its conditions:"
             echo "${out}" | tail -n +2
           else
-            echo "❌ ${HR} still there or unreadable after $(elapsed)s: $(tail -n 1 "${ERR}" 2>/dev/null)"
+            echo "❌ ${HR} still there or unreadable after $(elapsed)s: $(why 15)"
           fi
           cp "${LOOP_ERR}" "${ERR}"
           [ -n "${deleted}" ] || fail "Deleting ${HR} never went through."

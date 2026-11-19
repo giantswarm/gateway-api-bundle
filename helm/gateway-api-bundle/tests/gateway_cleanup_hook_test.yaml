@@ -23,9 +23,10 @@ tests:
       - equal:
           path: metadata.labels["app.kubernetes.io/component"]
           value: gateway-cleanup
+      # Recovery step 3 in the template comment deletes leftovers by these two labels.
       - equal:
-          path: metadata.labels["app.kubernetes.io/instance"]
-          value: test-gateway-api-bundle
+          path: metadata.labels["giantswarm.io/cluster"]
+          value: test
 
   - it: creates the ServiceAccount before the Job and removes it after the hook
     documentSelector:
