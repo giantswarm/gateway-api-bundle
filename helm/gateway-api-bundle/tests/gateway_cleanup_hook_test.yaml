@@ -21,40 +21,61 @@ tests:
           path: metadata.namespace
           value: org-test
 
-  - it: creates the RBAC before the Job
-    asserts:
+  - it: creates the ServiceAccount before the Job and removes it even when the hook fails
+    documentSelector:
+      path: kind
+      value: ServiceAccount
+    asserts: &rbacHook
       - equal:
           path: metadata.annotations["helm.sh/hook-weight"]
           value: "-1"
-        documentSelector:
-          path: kind
-          value: Role
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded,hook-failed
+
+  - it: creates the Role before the Job and removes it even when the hook fails
+    documentSelector:
+      path: kind
+      value: Role
+    asserts: *rbacHook
+
+  - it: creates the RoleBinding before the Job and removes it even when the hook fails
+    documentSelector:
+      path: kind
+      value: RoleBinding
+    asserts: *rbacHook
+
+  - it: runs the Job after the RBAC and keeps it when it fails
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
       - equal:
           path: metadata.annotations["helm.sh/hook-weight"]
           value: "0"
-        documentSelector:
-          path: kind
-          value: Job
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
 
-  - it: only lets the hook delete the gateway-api-config HelmRelease of the cluster
+  - it: only gives the hook access to the gateway-api-config HelmRelease of the cluster
     documentSelector:
       path: kind
       value: Role
     asserts:
-      - contains:
+      - equal:
           path: rules
-          content:
-            apiGroups:
-              - helm.toolkit.fluxcd.io
-            resources:
-              - helmreleases
-            resourceNames:
-              - test-gateway-api-config
-            verbs:
-              - delete
-      - lengthEqual:
-          path: rules
-          count: 2
+          value:
+            - apiGroups:
+                - helm.toolkit.fluxcd.io
+              resources:
+                - helmreleases
+              resourceNames:
+                - test-gateway-api-config
+              verbs:
+                - get
+                - list
+                - watch
+                - delete
 
   - it: runs the Job as the hook ServiceAccount against that HelmRelease
     documentSelector:
@@ -76,14 +97,23 @@ tests:
             value: org-test
       - matchRegex:
           path: spec.template.spec.containers[0].args[1]
-          pattern: timeout -k 5 "\$\{TIMEOUT\}" kubectl delete
+          pattern: timeout -k 2 "\$\{t\}" kubectl
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[1]
+          pattern: delete "\$\{HR\}" --ignore-not-found --wait=false
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[1]
+          pattern: wait "\$\{HR\}" --for=delete
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].args[1]
+          pattern: exit [1-9]
 
   - it: follows a renamed gateway-api-config app
     set:
       apps.gatewayApiConfig.appName: my-gateways
     asserts:
       - contains:
-          path: rules[1].resourceNames
+          path: rules[0].resourceNames
           content: test-my-gateways
         documentSelector:
           path: kind

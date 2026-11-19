@@ -14,11 +14,22 @@ is gone, so Flux uninstalls the chart while Envoy Gateway can still remove its
 proxies and the GatewayClass finalizer. It does not touch the workload cluster
 itself.
 
-It never waits longer than timeoutSeconds and always exits 0, so the bundle
-uninstall goes on even when gateway-api-config cannot be uninstalled in time,
-for example because a Gateway that gateway-api-config did not create still uses
-its GatewayClass. The Job deadline fires before the default 5m uninstall
-timeout, so a pod that never starts fails the hook instead of hanging it.
+It retries on API errors, never waits longer than timeoutSeconds and always
+exits 0, so the bundle uninstall goes on even when gateway-api-config cannot be
+uninstalled in time. That happens when a Gateway that gateway-api-config did not
+create still uses its GatewayClass, or when the workload cluster is unreachable
+while its kubeconfig secret still exists.
+
+Known limits:
+- The uninstall of the bundle waits for this hook. chart-operator, which
+  uninstalls the bundle as an App, sets no timeout for it unless the App sets
+  an uninstall timeout, and that must then be above timeoutSeconds + 60s.
+- Like any pre-delete hook, a Job that cannot run (image pull, quota, a
+  namespace that is already being deleted) fails the uninstall. To uninstall
+  without it: `helm uninstall --no-hooks`, or remove the finalizer of the
+  bundle's App/Chart CR.
+- Upgrades are not covered: disabling envoy-gateway and gateway-api-config in
+  one upgrade can still hang the same way.
 */}}
 {{- $cleanup := .Values.cleanup.gatewayApiConfig }}
 {{- $config := .Values.apps.gatewayApiConfig }}
@@ -36,7 +47,8 @@ metadata:
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    # hook-failed too: a ServiceAccount that can delete the HelmRelease must not stay behind.
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -48,18 +60,10 @@ metadata:
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
 rules:
-# kubectl delete --wait reads and watches the object until it is gone.
-- apiGroups:
-  - helm.toolkit.fluxcd.io
-  resources:
-  - helmreleases
-  verbs:
-  - get
-  - list
-  - watch
-# Only the gateway-api-config HelmRelease of this cluster can be deleted.
+# Only the gateway-api-config HelmRelease of this cluster. kubectl delete and kubectl wait
+# read it by name and watch it with a metadata.name field selector, which resourceNames allows.
 - apiGroups:
   - helm.toolkit.fluxcd.io
   resources:
@@ -67,6 +71,9 @@ rules:
   resourceNames:
   - {{ $helmRelease }}
   verbs:
+  - get
+  - list
+  - watch
   - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -79,7 +86,7 @@ metadata:
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -99,11 +106,11 @@ metadata:
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "0"
+    # A failed Job stays for debugging, ttlSecondsAfterFinished removes it.
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
   # The script stops itself at timeoutSeconds; this only catches a pod that never
-  # finishes, and fires before the default 5m uninstall timeout (timeoutSeconds is
-  # at most 200).
+  # finishes.
   activeDeadlineSeconds: {{ add $cleanup.timeoutSeconds 60 }}
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
@@ -153,17 +160,35 @@ spec:
           set -o nounset
 
           HR="helmreleases.helm.toolkit.fluxcd.io/${HELMRELEASE}"
+          start=$(date +%s)
+          deadline=$(( start + TIMEOUT ))
 
-          echo "🧹 Deleting ${HR} in ${NAMESPACE} and waiting for Flux to uninstall it."
+          # Seconds left, at least 1 (`kubectl --timeout 0s` waits for a week), at most $1.
+          left() { r=$(( deadline - $(date +%s) )); [ "${r}" -ge 1 ] || r=1; [ "${r}" -le "$1" ] || r=$1; echo "${r}"; }
+          expired() { [ "$(date +%s)" -ge "${deadline}" ]; }
           # busybox timeout kills kubectl at the deadline: --timeout only bounds the wait,
           # not the requests before it.
-          if timeout -k 5 "${TIMEOUT}" kubectl delete "${HR}" --namespace "${NAMESPACE}" \
-            --ignore-not-found --wait --timeout "${TIMEOUT}s"; then
-            echo "✅ ${HR} is gone."
-            exit 0
-          fi
+          kt() { t=$1; shift; timeout -k 2 "${t}" kubectl --namespace "${NAMESPACE}" "$@"; }
+          # True only when a successful read finds no HelmRelease; a failed read is not "gone".
+          gone() { out=$(kt "$(left 15)" get "${HR}" --ignore-not-found --output name) && [ -z "${out}" ]; }
 
-          echo "⚠️ ${HR} not gone after ${TIMEOUT}s. Its conditions:"
+          echo "🧹 Deleting ${HR} in ${NAMESPACE} and waiting for Flux to uninstall it."
+          # Retry until the deadline: an API error or an authorizer that does not see the new
+          # RoleBinding yet must not skip the cleanup.
+          while :; do
+            if kt "$(left 15)" delete "${HR}" --ignore-not-found --wait=false >/dev/null; then
+              t=$(left "${TIMEOUT}")
+              if kt "${t}" wait "${HR}" --for=delete --timeout "${t}s" >/dev/null 2>&1 || gone; then
+                echo "✅ ${HR} is gone after $(( $(date +%s) - start ))s."
+                exit 0
+              fi
+            fi
+            expired && break
+            echo "⏳ Retrying."
+            sleep "$(left 5)"
+          done
+
+          echo "⚠️ ${HR} not gone after $(( $(date +%s) - start ))s. Its conditions:"
           timeout -k 2 15 kubectl get "${HR}" --namespace "${NAMESPACE}" --ignore-not-found \
             --output jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}' || :
           echo "⚠️ If the uninstall waits on the GatewayClass finalizer, a Gateway that gateway-api-config did not create may still use the class."
