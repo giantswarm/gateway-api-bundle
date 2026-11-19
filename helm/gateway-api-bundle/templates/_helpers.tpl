@@ -173,3 +173,22 @@ AWS region, required.
 {{- end -}}
 {{- $aws.region -}}
 {{- end -}}
+
+{{/*
+duration.seconds — whole seconds of a Go duration such as "10m", "90s" or "1h30m".
+Fractions of a second are dropped. Fails on anything that adds up to 0.
+*/}}
+{{- define "duration.seconds" -}}
+{{- $total := 0 -}}
+{{- range $part := regexFindAll "[0-9]+(ms|us|µs|ns|h|m|s)" . -1 -}}
+{{- $n := regexFind "^[0-9]+" $part | int -}}
+{{- if hasSuffix "h" $part -}}{{- $total = add $total (mul $n 3600) -}}
+{{- else if and (hasSuffix "m" $part) (not (hasSuffix "ms" $part)) -}}{{- $total = add $total (mul $n 60) -}}
+{{- else if and (hasSuffix "s" $part) (not (regexMatch "(ms|us|µs|ns)$" $part)) -}}{{- $total = add $total $n -}}
+{{- end -}}
+{{- end -}}
+{{- if eq (int $total) 0 -}}
+{{- fail (printf "%q is not a duration of at least one second, such as 10m" .) -}}
+{{- end -}}
+{{- $total -}}
+{{- end -}}

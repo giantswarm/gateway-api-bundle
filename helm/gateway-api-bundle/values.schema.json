@@ -179,11 +179,6 @@
                         },
                         "image": {
                             "type": "string"
-                        },
-                        "timeoutSeconds": {
-                            "type": "integer",
-                            "maximum": 200,
-                            "minimum": 30
                         }
                     }
                 }

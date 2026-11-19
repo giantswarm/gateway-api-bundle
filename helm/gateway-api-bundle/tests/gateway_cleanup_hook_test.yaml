@@ -104,9 +104,9 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[0].args[1]
           pattern: wait "\$\{HR\}" --for=delete
-      - notMatchRegex:
+      - matchRegex:
           path: spec.template.spec.containers[0].args[1]
-          pattern: exit [1-9]
+          pattern: Failing the uninstall
 
   - it: follows a renamed gateway-api-config app
     set:
@@ -127,9 +127,7 @@ tests:
           path: kind
           value: Job
 
-  - it: stops itself at timeoutSeconds, the Job deadline is only a backstop
-    set:
-      cleanup.gatewayApiConfig.timeoutSeconds: 60
+  - it: waits as long as the gateway-api-config HelmRelease timeout, 10m by default
     documentSelector:
       path: kind
       value: Job
@@ -138,35 +136,33 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: TIMEOUT
-            value: "60"
+            value: "600"
       - equal:
           path: spec.activeDeadlineSeconds
-          value: 120
+          value: 660
 
-  - it: ends before the default 5m uninstall timeout at the largest timeoutSeconds
+  - it: follows a custom gateway-api-config timeout
     set:
-      cleanup.gatewayApiConfig.timeoutSeconds: 200
+      apps.gatewayApiConfig.timeout: 1h30m
     documentSelector:
       path: kind
       value: Job
     asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TIMEOUT
+            value: "5400"
       - equal:
           path: spec.activeDeadlineSeconds
-          value: 260
+          value: 5460
 
-  - it: rejects a timeoutSeconds above 200
+  - it: rejects a gateway-api-config timeout below one second
     set:
-      cleanup.gatewayApiConfig.timeoutSeconds: 201
+      apps.gatewayApiConfig.timeout: 500ms
     asserts:
       - failedTemplate:
-          errorPattern: "timeoutSeconds.*(201|200)"
-
-  - it: rejects a timeoutSeconds below 30
-    set:
-      cleanup.gatewayApiConfig.timeoutSeconds: 29
-    asserts:
-      - failedTemplate:
-          errorPattern: "timeoutSeconds.*(29|30)"
+          errorPattern: "500ms.*not a duration"
 
   - it: truncates the resource names to 63 characters
     release:
