@@ -245,6 +245,9 @@ spec:
             sleep "$(upto 5)"
           done
 
+          # Keep the error that ended the loop: the read below writes over it.
+          LOOP_ERR=/tmp/loop.err
+          cp "${ERR}" "${LOOP_ERR}" 2>/dev/null || : >"${LOOP_ERR}"
           # Flux may have finished just after the wait gave up. One call checks that and reads the
           # conditions: the output is empty when the HelmRelease is gone.
           if out=$(kt 15 get "${HR}" --ignore-not-found \
@@ -256,8 +259,10 @@ spec:
             echo "❌ ${HR} not gone after $(elapsed)s. Its conditions:"
             echo "${out}" | tail -n +2
           else
-            echo "❌ ${HR} still there or unreadable after $(elapsed)s."
+            echo "❌ ${HR} still there or unreadable after $(elapsed)s: $(tail -n 1 "${ERR}" 2>/dev/null)"
           fi
+          cp "${LOOP_ERR}" "${ERR}"
+          [ -n "${deleted}" ] || fail "Deleting ${HR} never went through."
           fail "If the uninstall waits on the GatewayClass finalizer, a Gateway that gateway-api-config did not create may still use the class."
         resources:
           requests:
