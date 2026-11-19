@@ -14,6 +14,8 @@ migration:
 # can be uninstalled first, the GatewayClass keeps its gateway-exists finalizer and the uninstall hangs.
 # The hook waits as long as the gateway-api-config HelmRelease's own timeout (apps.gatewayApiConfig.timeout,
 # 10m by default) and fails the bundle uninstall when it is reached, so envoy-gateway stays.
+# The bundle HelmRelease needs an uninstall timeout of at least that plus 2m (12m by default),
+# see templates/gateway-cleanup-hook.yaml.
 cleanup:
   gatewayApiConfig:
     enabled: true

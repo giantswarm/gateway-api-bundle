@@ -139,7 +139,7 @@ tests:
             value: "600"
       - equal:
           path: spec.activeDeadlineSeconds
-          value: 660
+          value: 690
 
   - it: follows a custom gateway-api-config timeout
     set:
@@ -155,7 +155,7 @@ tests:
             value: "5400"
       - equal:
           path: spec.activeDeadlineSeconds
-          value: 5460
+          value: 5490
 
   - it: reads decimal gateway-api-config timeouts
     set:

@@ -22,9 +22,9 @@ of the bundle. That happens when a Gateway that gateway-api-config did not
 create still uses its GatewayClass, or when the workload cluster cannot be
 reached.
 
-The bundle HelmRelease needs an uninstall timeout above the hook's, that is
-apps.gatewayApiConfig.timeout + 60s (11m by default), set where that
-HelmRelease is generated: spec.uninstall.timeout, or spec.timeout, which
+The bundle HelmRelease needs an uninstall timeout of at least
+apps.gatewayApiConfig.timeout + 2m (12m by default), which covers the hook Job's
+deadline. Set it where that HelmRelease is generated: spec.uninstall.timeout, or spec.timeout, which
 defaults to 5m. Below that, helm gives up on the hook first: each attempt
 fails with a hook timeout instead of the hook's own message, Flux retries and
 the hook starts waiting again. It still fails closed and goes through once
@@ -51,7 +51,8 @@ When the bundle uninstall is stuck on this hook:
   2. Set spec.uninstall.disableHooks on the bundle HelmRelease. If a
      Kustomization still manages it, suspend that first, or it reverts the
      change.
-  3. Delete what failed hook attempts left behind:
+  3. Delete what failed hook attempts left behind. The name is cut to 63
+     characters for long release names:
      kubectl delete serviceaccount,role,rolebinding,job -n <namespace> <bundle release>-gateway-cleanup --ignore-not-found
 - To stop using the hook, set cleanup.gatewayApiConfig.enabled to false and let
   Flux upgrade the bundle before deleting it: hooks come from the installed
@@ -142,9 +143,9 @@ metadata:
     # A failed Job stays for debugging, ttlSecondsAfterFinished removes it.
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
-  # The script fails itself at the timeout; the 60s on top cover scheduling and pulling
-  # the image, and catch a pod that never finishes.
-  activeDeadlineSeconds: {{ add $timeout 60 }}
+  # The script fails itself within about 30s after the timeout; the 90s on top also cover
+  # scheduling and pulling the image, and catch a pod that never finishes.
+  activeDeadlineSeconds: {{ add $timeout 90 }}
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
   template:
@@ -241,12 +242,12 @@ spec:
           done
 
           # Flux may have finished just after the wait gave up.
-          if out=$(kt 15 get "${HR}" --ignore-not-found --output name) && [ -z "${out}" ]; then
+          if out=$(kt 10 get "${HR}" --ignore-not-found --output name) && [ -z "${out}" ]; then
             echo "✅ ${HR} is gone after $(elapsed)s."
             exit 0
           fi
           echo "❌ ${HR} not gone after $(elapsed)s. Its conditions:"
-          kt 15 get "${HR}" \
+          kt 10 get "${HR}" \
             --output jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}' \
             || last_error || :
           fail "If the uninstall waits on the GatewayClass finalizer, a Gateway that gateway-api-config did not create may still use the class."
