@@ -38,7 +38,12 @@ Known limits:
        kubectl delete helmreleases.helm.toolkit.fluxcd.io -n <namespace> <cluster>-gateway-api-config --timeout=5m
        If it does not finish, a Gateway that gateway-api-config did not
        create may still use the GatewayClass: delete that Gateway, or remove
-       the GatewayClass finalizer, and it goes on.
+       the GatewayClass finalizer, and it goes on. If the workload cluster is
+       gone, nothing can hang on the GatewayClass: remove the HelmRelease
+       finalizer instead. Go on only once this returns NotFound:
+       kubectl get helmreleases.helm.toolkit.fluxcd.io -n <namespace> <cluster>-gateway-api-config
+       The next step also removes envoy-gateway, and with gateway-api-config
+       still there the original hang comes back.
     2. helm uninstall --no-hooks -n <namespace> <bundle release>
        chart-operator then finds no release, drops the Chart CR finalizer,
        and app-operator drops the App CR one.
