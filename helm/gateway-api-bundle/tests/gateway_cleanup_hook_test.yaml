@@ -20,6 +20,12 @@ tests:
       - equal:
           path: metadata.namespace
           value: org-test
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: gateway-cleanup
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: test-gateway-api-bundle
 
   - it: creates the ServiceAccount before the Job and removes it after the hook
     documentSelector:

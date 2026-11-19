@@ -51,10 +51,9 @@ When the bundle uninstall is stuck on this hook:
   2. Set spec.uninstall.disableHooks on the bundle HelmRelease. If a
      Kustomization still manages it, suspend that first, or it reverts the
      change.
-  3. Delete what failed hook attempts left behind. Look the name up rather
-     than building it, as it is cut to 63 characters for long release names:
-     kubectl get jobs -n <namespace> -l giantswarm.io/managed-by=<bundle release> | grep gateway-cleanup
-     kubectl delete serviceaccount,role,rolebinding,job -n <namespace> <that name> --ignore-not-found
+  3. Delete what failed hook attempts left behind. The Job goes after an
+     hour, the ServiceAccount, Role and RoleBinding stay:
+     kubectl delete serviceaccount,role,rolebinding,job -n <namespace> -l app.kubernetes.io/instance=<bundle release>,app.kubernetes.io/component=gateway-cleanup
 - To stop using the hook, set cleanup.gatewayApiConfig.enabled to false and let
   Flux upgrade the bundle before deleting it: hooks come from the installed
   release, not from the values at delete time.
@@ -77,6 +76,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "labels.common" . | nindent 4 }}
+    app.kubernetes.io/component: gateway-cleanup
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
@@ -92,6 +92,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "labels.common" . | nindent 4 }}
+    app.kubernetes.io/component: gateway-cleanup
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
@@ -118,6 +119,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "labels.common" . | nindent 4 }}
+    app.kubernetes.io/component: gateway-cleanup
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "-1"
@@ -138,6 +140,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "labels.common" . | nindent 4 }}
+    app.kubernetes.io/component: gateway-cleanup
   annotations:
     helm.sh/hook: pre-delete
     helm.sh/hook-weight: "0"
