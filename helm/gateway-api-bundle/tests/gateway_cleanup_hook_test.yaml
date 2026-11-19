@@ -7,59 +7,102 @@ release:
 set:
   clusterID: test
 tests:
-  - it: renders a pre-delete Job against the workload cluster
+  - it: renders a ServiceAccount, Role, RoleBinding and Job as pre-delete hooks
     asserts:
       - hasDocuments:
-          count: 1
-      - isKind:
-          of: Job
-      - equal:
-          path: metadata.name
-          value: test-gateway-api-bundle-gateway-cleanup
+          count: 4
       - equal:
           path: metadata.annotations["helm.sh/hook"]
           value: pre-delete
       - equal:
-          path: spec.template.spec.volumes[0].secret
-          value:
-            secretName: test-kubeconfig
-            optional: true
-            items:
-              - key: value
-                path: kubeconfig
+          path: metadata.name
+          value: test-gateway-api-bundle-gateway-cleanup
+      - equal:
+          path: metadata.namespace
+          value: org-test
 
-  - it: targets the gateway-api-config release and namespace
+  - it: creates the RBAC before the Job
     asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-1"
+        documentSelector:
+          path: kind
+          value: Role
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "0"
+        documentSelector:
+          path: kind
+          value: Job
+
+  - it: only lets the hook delete the gateway-api-config HelmRelease of the cluster
+    documentSelector:
+      path: kind
+      value: Role
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - helm.toolkit.fluxcd.io
+            resources:
+              - helmreleases
+            resourceNames:
+              - test-gateway-api-config
+            verbs:
+              - delete
+      - lengthEqual:
+          path: rules
+          count: 2
+
+  - it: runs the Job as the hook ServiceAccount against that HelmRelease
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: test-gateway-api-bundle-gateway-cleanup
       - contains:
           path: spec.template.spec.containers[0].env
           content:
-            name: RELEASE
-            value: gateway-api-config
+            name: HELMRELEASE
+            value: test-gateway-api-config
       - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: NAMESPACE
-            value: envoy-gateway-system
+            value: org-test
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[1]
+          pattern: timeout -k 5 "\$\{TIMEOUT\}" kubectl delete
 
   - it: follows a renamed gateway-api-config app
     set:
       apps.gatewayApiConfig.appName: my-gateways
-      apps.gatewayApiConfig.namespace: gateways
     asserts:
       - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: RELEASE
-            value: my-gateways
+          path: rules[1].resourceNames
+          content: test-my-gateways
+        documentSelector:
+          path: kind
+          value: Role
       - contains:
           path: spec.template.spec.containers[0].env
           content:
-            name: NAMESPACE
-            value: gateways
+            name: HELMRELEASE
+            value: test-my-gateways
+        documentSelector:
+          path: kind
+          value: Job
 
   - it: stops itself at timeoutSeconds, the Job deadline is only a backstop
     set:
       cleanup.gatewayApiConfig.timeoutSeconds: 60
+    documentSelector:
+      path: kind
+      value: Job
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
@@ -70,7 +113,32 @@ tests:
           path: spec.activeDeadlineSeconds
           value: 120
 
-  - it: truncates the Job name to 63 characters
+  - it: ends before the default 5m uninstall timeout at the largest timeoutSeconds
+    set:
+      cleanup.gatewayApiConfig.timeoutSeconds: 200
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 260
+
+  - it: rejects a timeoutSeconds above 200
+    set:
+      cleanup.gatewayApiConfig.timeoutSeconds: 201
+    asserts:
+      - failedTemplate:
+          errorPattern: "timeoutSeconds.*(201|200)"
+
+  - it: rejects a timeoutSeconds below 30
+    set:
+      cleanup.gatewayApiConfig.timeoutSeconds: 29
+    asserts:
+      - failedTemplate:
+          errorPattern: "timeoutSeconds.*(29|30)"
+
+  - it: truncates the resource names to 63 characters
     release:
       name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     asserts:
@@ -98,23 +166,3 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
-
-  - it: ends before the default 5m uninstall timeout at the largest timeoutSeconds
-    set:
-      cleanup.gatewayApiConfig.timeoutSeconds: 200
-    asserts:
-      - equal:
-          path: spec.activeDeadlineSeconds
-          value: 260
-
-  - it: rejects a timeoutSeconds above 200
-    set:
-      cleanup.gatewayApiConfig.timeoutSeconds: 201
-    asserts:
-      - failedTemplate: {}
-
-  - it: rejects a timeoutSeconds below 30
-    set:
-      cleanup.gatewayApiConfig.timeoutSeconds: 29
-    asserts:
-      - failedTemplate: {}

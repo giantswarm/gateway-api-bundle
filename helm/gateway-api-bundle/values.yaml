@@ -9,15 +9,15 @@ migration:
     enabled: true
     image: gsoci.azurecr.io/giantswarm/docker-kubectl:1.37.2
 
-# pre-delete hook: when the bundle is uninstalled, delete the Gateways and GatewayClasses of
-# gateway-api-config while Envoy Gateway still runs. Otherwise envoy-gateway can be uninstalled
-# first, the GatewayClass keeps its gateway-exists finalizer and the uninstall hangs.
+# pre-delete hook: when the bundle is uninstalled, delete the gateway-api-config HelmRelease in this
+# namespace and wait for Flux to uninstall it while Envoy Gateway still runs. Otherwise envoy-gateway
+# can be uninstalled first, the GatewayClass keeps its gateway-exists finalizer and the uninstall hangs.
 cleanup:
   gatewayApiConfig:
     enabled: true
     image: gsoci.azurecr.io/giantswarm/docker-kubectl:1.37.2
-    # How long the hook waits for the Gateways, their Envoy proxies and the GatewayClasses to be
-    # gone before it lets the uninstall continue anyway. Keep it well below the uninstall timeout
+    # How long the hook waits for the gateway-api-config HelmRelease to be gone before it lets the
+    # uninstall continue anyway. Keep it well below the uninstall timeout
     # of the bundle (5m by default): the Job is stopped 60s after it. At most 200.
     timeoutSeconds: 180  # @schema minimum: 30; maximum: 200
 

@@ -1,6 +1,5 @@
 {{- /*
-pre-delete: remove the Gateways and GatewayClasses of gateway-api-config while
-Envoy Gateway still runs.
+pre-delete: uninstall gateway-api-config while envoy-gateway still runs.
 
 Flux only honours dependsOn on install and upgrade. When the bundle is
 uninstalled, helm deletes all HelmReleases at once, so envoy-gateway is often
@@ -9,29 +8,86 @@ gateway-exists-finalizer.gateway.networking.k8s.io on a GatewayClass that has
 Gateways, and nothing else removes it: the gateway-api-config uninstall then
 hangs and the Envoy proxies keep running.
 
-This hook runs before helm deletes any HelmRelease:
-1. It deletes the Gateways of gateway-api-config in its namespace.
-2. It waits until Envoy Gateway has removed their proxies (Deployments,
-   DaemonSets, Services, so their load balancers too).
-3. It deletes the GatewayClasses of gateway-api-config, except a class that a
-   Gateway gateway-api-config did not create still uses: that one is left.
+This hook runs in the management cluster before helm deletes any HelmRelease
+of the bundle. It deletes the gateway-api-config HelmRelease and waits until it
+is gone, so Flux uninstalls the chart while Envoy Gateway can still remove its
+proxies and the GatewayClass finalizer. It does not touch the workload cluster
+itself.
 
-It does not fail the uninstall on workload cluster conditions: every API call
-ends by the deadline, the run stays within timeoutSeconds, and it exits 0 when the
-workload cluster cannot be reached, the Gateway API CRDs are missing, or
-resources are still left at the deadline. The Job deadline fires before the
-default 5m uninstall timeout, so a pod that never starts fails the hook instead
-of hanging it.
-
-Gateways it already deleted stay deleted if the uninstall then fails for another
-reason. The child HelmReleases have no drift detection, so a bundle upgrade does
-not bring them back unless gateway-api-config's version or values change:
-`flux reconcile helmrelease <cluster>-gateway-api-config --force` reinstalls them.
+It never waits longer than timeoutSeconds and always exits 0, so the bundle
+uninstall goes on even when gateway-api-config cannot be uninstalled in time,
+for example because a Gateway that gateway-api-config did not create still uses
+its GatewayClass. The Job deadline fires before the default 5m uninstall
+timeout, so a pod that never starts fails the hook instead of hanging it.
 */}}
 {{- $cleanup := .Values.cleanup.gatewayApiConfig }}
 {{- $config := .Values.apps.gatewayApiConfig }}
 {{- if and $cleanup.enabled $config.enabled .Values.apps.envoyGateway.enabled }}
 {{- $name := printf "%s-gateway-cleanup" .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- $helmRelease := include "app.name" (dict "app" $config.appName "cluster" .Values.clusterID) }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+# kubectl delete --wait reads and watches the object until it is gone.
+- apiGroups:
+  - helm.toolkit.fluxcd.io
+  resources:
+  - helmreleases
+  verbs:
+  - get
+  - list
+  - watch
+# Only the gateway-api-config HelmRelease of this cluster can be deleted.
+- apiGroups:
+  - helm.toolkit.fluxcd.io
+  resources:
+  - helmreleases
+  resourceNames:
+  - {{ $helmRelease }}
+  verbs:
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -42,10 +98,12 @@ metadata:
     {{- include "labels.common" . | nindent 4 }}
   annotations:
     helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "0"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
-  # The script stops itself at timeoutSeconds; this only catches a hung pod, and fires
-  # before the default 5m uninstall timeout (timeoutSeconds is at most 200).
+  # The script stops itself at timeoutSeconds; this only catches a pod that never
+  # finishes, and fires before the default 5m uninstall timeout (timeoutSeconds is
+  # at most 200).
   activeDeadlineSeconds: {{ add $cleanup.timeoutSeconds 60 }}
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
@@ -54,16 +112,12 @@ spec:
       labels:
         {{- include "labels.common" . | nindent 8 }}
     spec:
-      automountServiceAccountToken: false
+      serviceAccountName: {{ $name }}
       restartPolicy: Never
       volumes:
-      - name: kubeconfig
-        secret:
-          secretName: {{ .Values.clusterID }}-kubeconfig
-          optional: true
-          items:
-          - key: value
-            path: kubeconfig
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
       containers:
       - name: kubectl
         image: {{ $cleanup.image }}
@@ -79,16 +133,16 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         volumeMounts:
-        - name: kubeconfig
-          mountPath: /etc/kubeconfig-secret
-          readOnly: true
+        - name: tmp
+          mountPath: /tmp
         env:
-        - name: KUBECONFIG
-          value: /etc/kubeconfig-secret/kubeconfig
-        - name: RELEASE
-          value: {{ $config.appName | quote }}
+        # Writable HOME for kubectl's discovery cache.
+        - name: HOME
+          value: /tmp
+        - name: HELMRELEASE
+          value: {{ $helmRelease | quote }}
         - name: NAMESPACE
-          value: {{ $config.namespace | quote }}
+          value: {{ .Release.Namespace | quote }}
         - name: TIMEOUT
           value: {{ $cleanup.timeoutSeconds | quote }}
         command:
@@ -98,110 +152,23 @@ spec:
         - |
           set -o nounset
 
-          SELECTOR="giantswarm.io/managed-by=${RELEASE}"
-          GATEWAYS=gateways.gateway.networking.k8s.io
-          CLASSES=gatewayclasses.gateway.networking.k8s.io
-          deadline=$(( $(date +%s) + TIMEOUT ))
+          HR="helmreleases.helm.toolkit.fluxcd.io/${HELMRELEASE}"
 
-          # Seconds left until the deadline, at least 1: `kubectl --timeout 0s` waits for a week.
-          remaining() { r=$(( deadline - $(date +%s) )); [ "${r}" -ge 1 ] || r=1; echo "${r}"; }
-          expired() { [ "$(date +%s)" -ge "${deadline}" ]; }
-          # Every API call ends by the deadline, so the run overruns timeoutSeconds by a few
-          # seconds at most and the Job's 60s margin is left for starting the pod.
-          k() { t=$(remaining); [ "${t}" -le 15 ] || t=15; kubectl --request-timeout="${t}s" "$@"; }
-          # delete --wait: the request timeout also bounds the watch, so it gets all the time left.
-          del() { t=$(remaining); kubectl delete "$@" --ignore-not-found --wait --timeout "${t}s" --request-timeout="${t}s"; }
-          done_ok() { echo "✅ $*"; exit 0; }
-          give_up() { echo "⚠️ $*"; echo "⚠️ Continuing the uninstall anyway."; exit 0; }
-
-          [ -s "${KUBECONFIG}" ] || done_ok "No workload cluster kubeconfig, nothing to clean up."
-          k version >/dev/null 2>&1 || give_up "Workload cluster not reachable, skipping the Gateway cleanup."
-
-          if ! crd=$(k get customresourcedefinitions.apiextensions.k8s.io "${CLASSES}" --ignore-not-found --output name); then
-            give_up "Could not look up the Gateway API CRDs."
-          fi
-          [ -n "${crd}" ] || done_ok "No Gateway API CRDs in the workload cluster, nothing to clean up."
-
-          if ! classes=$(k get "${CLASSES}" --selector "${SELECTOR}" --output jsonpath='{.items[*].metadata.name}'); then
-            give_up "Could not list the GatewayClasses matching '${SELECTOR}'."
-          fi
-          if ! gateways=$(k get "${GATEWAYS}" --namespace "${NAMESPACE}" --selector "${SELECTOR}" --output jsonpath='{.items[*].metadata.name}'); then
-            give_up "Could not list the Gateways matching '${SELECTOR}' in ${NAMESPACE}."
-          fi
-          # Gateways that gateway-api-config did not create but that use one of its GatewayClasses,
-          # as "<class> <namespace>/<name>". While they exist, Envoy Gateway keeps that class's
-          # finalizer (and its merged proxy), so only that class is left alone.
-          foreign=""
-          if [ -n "${classes}" ]; then
-            if ! all=$(k get "${GATEWAYS}" --all-namespaces --output jsonpath='{range .items[*]}{.spec.gatewayClassName} {.metadata.namespace} {.metadata.name} {.metadata.labels.giantswarm\.io/managed-by}{"\n"}{end}'); then
-              give_up "Could not list Gateways."
-            fi
-            foreign=$(echo "${all}" | awk -v classes=" ${classes} " -v ns="${NAMESPACE}" -v rel="${RELEASE}" \
-              'NF >= 3 && index(classes, " " $1 " ") && !($2 == ns && $4 == rel) { print $1 " " $2 "/" $3 }')
-          fi
-          free_classes=""
-          kept_classes=""
-          for c in ${classes}; do
-            if echo "${foreign}" | awk -v c="${c}" '$1 == c { found = 1 } END { exit !found }'; then
-              kept_classes="${kept_classes} ${c}"
-            else
-              free_classes="${free_classes} ${c}"
-            fi
-          done
-
-          # 1. Gateways.
-          if [ -n "${gateways}" ]; then
-            echo "🧹 Deleting Gateways in ${NAMESPACE}:" ${gateways}
-            del "${GATEWAYS}" --namespace "${NAMESPACE}" ${gateways} \
-              || give_up "Gateways not gone before the deadline."
+          echo "🧹 Deleting ${HR} in ${NAMESPACE} and waiting for Flux to uninstall it."
+          # busybox timeout kills kubectl at the deadline: --timeout only bounds the wait,
+          # not the requests before it.
+          if timeout -k 5 "${TIMEOUT}" kubectl delete "${HR}" --namespace "${NAMESPACE}" \
+            --ignore-not-found --wait --timeout "${TIMEOUT}s"; then
+            echo "✅ ${HR} is gone."
+            exit 0
           fi
 
-          # 2. Their proxies. Envoy Gateway removes them asynchronously, in its own namespace or the
-          # Gateway's, labelled with the owning Gateway, or with the GatewayClass when Gateways are merged.
-          proxies_left=""
-          wait_gone() {
-            while :; do
-              if left=$(k get deployments.apps,daemonsets.apps,services --all-namespaces --selector "$1" --output name); then
-                [ -n "${left}" ] || return 0
-              else
-                left="(listing failed)"
-              fi
-              if expired; then
-                proxies_left="${proxies_left} ${left}"
-                return 0
-              fi
-              echo "⏳ Waiting for Envoy Gateway to remove the proxies:" ${left}
-              s=$(remaining); [ "${s}" -le 5 ] || s=5
-              sleep "${s}"
-            done
-          }
-          if [ -n "${gateways}" ]; then
-            wait_gone "gateway.envoyproxy.io/owning-gateway-namespace=${NAMESPACE},gateway.envoyproxy.io/owning-gateway-name in ($(echo ${gateways} | tr ' ' ','))"
-          fi
-          if [ -n "${free_classes}" ] && ! expired; then
-            wait_gone "gateway.envoyproxy.io/owning-gatewayclass in ($(echo ${free_classes} | tr ' ' ','))"
-          fi
-          if [ -n "${proxies_left}" ]; then
-            echo "⚠️ Envoy proxies still present at the deadline:" ${proxies_left}
-          elif [ -n "${gateways}${free_classes}" ]; then
-            echo "✅ Envoy proxies of ${RELEASE} removed."
-          fi
-
-          # 3. GatewayClasses that no Gateway from outside gateway-api-config uses.
-          [ -n "${classes}" ] || done_ok "No GatewayClasses matching '${SELECTOR}'."
-          if [ -n "${kept_classes}" ]; then
-            foreign_gateways=$(echo "${foreign}" | awk '{ print $2 }')
-            echo "⚠️ Leaving GatewayClasses" ${kept_classes}", Gateways not created by ${RELEASE} still use them." \
-              "Delete them for the uninstall of ${RELEASE} to finish:" ${foreign_gateways}
-          fi
-          if [ -n "${free_classes}" ]; then
-            ! expired || give_up "Deadline reached, GatewayClasses not deleted:" ${free_classes}
-            echo "🧹 Deleting GatewayClasses:" ${free_classes}
-            del "${CLASSES}" ${free_classes} \
-              || give_up "GatewayClasses not gone before the deadline:" ${free_classes}
-          fi
-          [ -z "${kept_classes}" ] || give_up "GatewayClasses left:" ${kept_classes}
-          done_ok "Gateways and GatewayClasses of ${RELEASE} are gone."
+          echo "⚠️ ${HR} not gone after ${TIMEOUT}s. Its conditions:"
+          timeout -k 2 15 kubectl get "${HR}" --namespace "${NAMESPACE}" --ignore-not-found \
+            --output jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}' || :
+          echo "⚠️ If the uninstall waits on the GatewayClass finalizer, a Gateway that gateway-api-config did not create may still use the class."
+          echo "⚠️ Continuing the uninstall anyway."
+          exit 0
         resources:
           requests:
             cpu: 100m
