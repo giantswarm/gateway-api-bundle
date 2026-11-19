@@ -51,10 +51,8 @@ When the bundle uninstall is stuck on this hook:
   2. Set spec.uninstall.disableHooks on the bundle HelmRelease. If a
      Kustomization still manages it, suspend that first, or it reverts the
      change.
-  3. Delete what is left of failed hook attempts. <bundle release> is the
-     Helm release name, which helm list -n <namespace> shows; it can differ
-     from the name of the bundle HelmRelease:
-     kubectl delete serviceaccount,role,rolebinding,job -n <namespace> -l app.kubernetes.io/instance=<bundle release>,app.kubernetes.io/component=gateway-cleanup
+  3. Delete what is left of failed hook attempts:
+     kubectl delete serviceaccount,role,rolebinding,job -n <namespace> -l giantswarm.io/cluster=<cluster>,app.kubernetes.io/component=gateway-cleanup
 - To stop using the hook, set cleanup.gatewayApiConfig.enabled to false and let
   Flux upgrade the bundle before deleting it: hooks come from the installed
   release, not from the values at delete time.
