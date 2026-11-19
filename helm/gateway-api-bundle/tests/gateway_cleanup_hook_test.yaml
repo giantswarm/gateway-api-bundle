@@ -68,7 +68,7 @@ tests:
             value: "60"
       - equal:
           path: spec.activeDeadlineSeconds
-          value: 180
+          value: 120
 
   - it: truncates the Job name to 63 characters
     release:
