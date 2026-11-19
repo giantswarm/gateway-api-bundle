@@ -20,8 +20,20 @@ can clear. If gateway-api-config is not gone by then, the hook fails and so
 does the bundle uninstall: envoy-gateway stays, and Flux retries the uninstall
 of the bundle. That happens when a Gateway that gateway-api-config did not
 create still uses its GatewayClass, or when the workload cluster cannot be
-reached. The uninstall timeout of the bundle HelmRelease has to be above the
-hook's, or helm gives up on the hook first.
+reached.
+
+The bundle HelmRelease needs an uninstall timeout above the hook's, that is
+apps.gatewayApiConfig.timeout + 60s (11m by default), set where that
+HelmRelease is generated: spec.uninstall.timeout, or spec.timeout, which
+defaults to 5m. Below that, helm gives up on the hook first: each attempt
+fails with a hook timeout instead of the hook's own message, Flux retries and
+the hook starts waiting again. It still fails closed and goes through once
+gateway-api-config is gone.
+
+The hook waits inside a helm-controller worker, while the gateway-api-config
+uninstall it waits for needs a worker of the same controller. Deleting as many
+bundles at once as helm-controller has workers (--concurrent) can stall them
+all until the hooks time out.
 
 When the bundle uninstall is stuck on this hook:
 - Fix what keeps gateway-api-config from uninstalling, for example a Gateway
@@ -31,11 +43,19 @@ When the bundle uninstall is stuck on this hook:
   <cluster>-gateway-api-config HelmRelease. Other HelmReleases of the bundle
   may need the same once the bundle is gone.
 - If the hook cannot run at all (image pull, quota, a namespace that is already
-  being deleted): delete the gateway-api-config HelmRelease by hand and wait
-  until `kubectl get helmreleases.helm.toolkit.fluxcd.io -n <namespace>
-  <cluster>-gateway-api-config` returns NotFound, then set
-  spec.uninstall.disableHooks on the bundle HelmRelease. Going on while
-  gateway-api-config still exists brings the original hang back.
+  being deleted):
+  1. Delete the gateway-api-config HelmRelease by hand and wait until this
+     returns NotFound. Going on while it still exists brings the original
+     hang back:
+     kubectl get helmreleases.helm.toolkit.fluxcd.io -n <namespace> <cluster>-gateway-api-config
+  2. Set spec.uninstall.disableHooks on the bundle HelmRelease. If a
+     Kustomization still manages it, suspend that first, or it reverts the
+     change.
+  3. Delete what failed hook attempts left behind:
+     kubectl delete serviceaccount,role,rolebinding,job -n <namespace> <bundle release>-gateway-cleanup --ignore-not-found
+- To stop using the hook, set cleanup.gatewayApiConfig.enabled to false and let
+  Flux upgrade the bundle before deleting it: hooks come from the installed
+  release, not from the values at delete time.
 
 Upgrades are not covered: disabling envoy-gateway and gateway-api-config in one
 upgrade can still hang the same way.
@@ -185,7 +205,8 @@ spec:
           kt() { t=$1; shift; timeout -k 2 "${t}" kubectl --namespace "${NAMESPACE}" "$@" 2>"${ERR}"; }
           last_error() { [ -s "${ERR}" ] && echo "❌ Last error: $(tail -n 1 "${ERR}")"; }
           NO_CRD="doesn't have a resource type|no matches for kind"
-          DENIED="denied the request|admission webhook"
+          # Admission webhooks and ValidatingAdmissionPolicies.
+          DENIED="denied (the )?request|admission webhook"
           fail() {
             last_error
             echo "❌ $*"
@@ -219,6 +240,11 @@ spec:
             sleep "$(upto 5)"
           done
 
+          # Flux may have finished just after the wait gave up.
+          if out=$(kt 15 get "${HR}" --ignore-not-found --output name) && [ -z "${out}" ]; then
+            echo "✅ ${HR} is gone after $(elapsed)s."
+            exit 0
+          fi
           echo "❌ ${HR} not gone after $(elapsed)s. Its conditions:"
           kt 15 get "${HR}" \
             --output jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}' \

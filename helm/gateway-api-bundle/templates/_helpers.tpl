@@ -175,20 +175,21 @@ AWS region, required.
 {{- end -}}
 
 {{/*
-duration.seconds — whole seconds of a Go duration such as "10m", "90s" or "1h30m".
-Fractions of a second are dropped. Fails on anything that adds up to 0.
+duration.seconds — whole seconds of a Go duration as Flux accepts it, such as "10m",
+"90s", "1h30m" or "1.5h". Fractions of a second are dropped, but a duration of less than
+a second gives 1. Fails when nothing in it is a duration.
 */}}
 {{- define "duration.seconds" -}}
-{{- $total := 0 -}}
-{{- range $part := regexFindAll "[0-9]+(ms|us|µs|ns|h|m|s)" . -1 -}}
-{{- $n := regexFind "^[0-9]+" $part | int -}}
-{{- if hasSuffix "h" $part -}}{{- $total = add $total (mul $n 3600) -}}
-{{- else if and (hasSuffix "m" $part) (not (hasSuffix "ms" $part)) -}}{{- $total = add $total (mul $n 60) -}}
-{{- else if and (hasSuffix "s" $part) (not (regexMatch "(ms|us|µs|ns)$" $part)) -}}{{- $total = add $total $n -}}
+{{- $total := 0.0 -}}
+{{- $parts := regexFindAll "[0-9]+(\\.[0-9]+)?(ns|us|µs|ms|h|m|s)" . -1 -}}
+{{- if not $parts -}}
+{{- fail (printf "%q is not a duration, such as 10m" .) -}}
 {{- end -}}
+{{- range $part := $parts -}}
+{{- $n := regexFind "^[0-9]+(\\.[0-9]+)?" $part | float64 -}}
+{{- $unit := regexReplaceAll "^[0-9.]+" $part "" -}}
+{{- $factor := get (dict "h" 3600.0 "m" 60.0 "s" 1.0 "ms" 0.001 "us" 0.000001 "µs" 0.000001 "ns" 0.000000001) $unit -}}
+{{- $total = addf $total (mulf $n $factor) -}}
 {{- end -}}
-{{- if eq (int $total) 0 -}}
-{{- fail (printf "%q is not a duration of at least one second, such as 10m" .) -}}
-{{- end -}}
-{{- $total -}}
+{{- max 1 (floor $total | int) -}}
 {{- end -}}

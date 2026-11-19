@@ -157,12 +157,38 @@ tests:
           path: spec.activeDeadlineSeconds
           value: 5460
 
-  - it: rejects a gateway-api-config timeout below one second
+  - it: reads decimal gateway-api-config timeouts
+    set:
+      apps.gatewayApiConfig.timeout: 1.5h
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TIMEOUT
+            value: "5400"
+
+  - it: waits at least one second for a sub-second gateway-api-config timeout
     set:
       apps.gatewayApiConfig.timeout: 500ms
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TIMEOUT
+            value: "1"
+
+  - it: rejects a gateway-api-config timeout that is not a duration
+    set:
+      apps.gatewayApiConfig.timeout: soon
     asserts:
       - failedTemplate:
-          errorPattern: "500ms.*not a duration"
+          errorPattern: "soon.*not a duration"
 
   - it: truncates the resource names to 63 characters
     release:
