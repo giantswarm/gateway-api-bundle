@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Deleting the bundle no longer hangs on the `gateway-exists-finalizer` of the GatewayClass. A `pre-delete` hook deletes the Gateways and GatewayClasses of `gateway-api-config` while Envoy Gateway still runs, so Envoy Gateway removes the proxies and the finalizer before helm deletes the HelmReleases. Flux only honours `dependsOn` on install and upgrade, so `envoy-gateway` could be uninstalled first. Disable it with `cleanup.gatewayApiConfig.enabled: false`.
+
 ## [2.1.0] - 2026-11-17
 
 ### Changed

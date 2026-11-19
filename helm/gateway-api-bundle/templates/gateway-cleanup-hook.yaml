@@ -1,0 +1,125 @@
+{{- /*
+pre-delete: remove the Gateways and GatewayClasses of gateway-api-config while
+Envoy Gateway still runs.
+
+Flux only honours dependsOn on install and upgrade. When the bundle is
+uninstalled, helm deletes all HelmReleases at once, so envoy-gateway is often
+gone before gateway-api-config. Envoy Gateway puts
+gateway-exists-finalizer.gateway.networking.k8s.io on a GatewayClass that has
+Gateways, and nothing else removes it: the gateway-api-config uninstall then
+hangs and the Envoy proxies keep running.
+
+This hook runs before helm deletes any HelmRelease. It deletes the Gateways of
+gateway-api-config, so Envoy Gateway deprovisions their proxies and drops the
+finalizer, then the GatewayClasses. It never blocks the uninstall: it exits 0
+when the workload cluster cannot be reached, when the Gateway API CRDs are
+missing, or when resources are still left at the deadline.
+*/}}
+{{- $cleanup := .Values.cleanup.gatewayApiConfig }}
+{{- $config := .Values.apps.gatewayApiConfig }}
+{{- if and $cleanup.enabled $config.enabled .Values.apps.envoyGateway.enabled }}
+{{- $name := printf "%s-gateway-cleanup" .Release.Name | trunc 63 | trimSuffix "-" }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: {{ add $cleanup.timeoutSeconds 60 }}
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "labels.common" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: {{ .Values.clusterID }}-kubeconfig
+          optional: true
+          items:
+          - key: value
+            path: kubeconfig
+      containers:
+      - name: kubectl
+        image: {{ $cleanup.image }}
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /etc/kubeconfig-secret
+          readOnly: true
+        env:
+        - name: KUBECONFIG
+          value: /etc/kubeconfig-secret/kubeconfig
+        - name: SELECTOR
+          value: {{ printf "giantswarm.io/managed-by=%s" $config.appName | quote }}
+        - name: TIMEOUT
+          value: {{ $cleanup.timeoutSeconds | quote }}
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - |
+          set -o nounset
+
+          if [ ! -s "${KUBECONFIG}" ]; then
+            echo "✅ No workload cluster kubeconfig, nothing to clean up."
+            exit 0
+          fi
+          if ! kubectl version --request-timeout=15s >/dev/null 2>&1; then
+            echo "⚠️ Workload cluster not reachable, skipping the Gateway cleanup."
+            exit 0
+          fi
+          if [ -z "$(kubectl get customresourcedefinitions.apiextensions.k8s.io gatewayclasses.gateway.networking.k8s.io --ignore-not-found --output name)" ]; then
+            echo "✅ No Gateway API CRDs in the workload cluster, nothing to clean up."
+            exit 0
+          fi
+
+          deadline=$(( $(date +%s) + TIMEOUT ))
+          remaining() { echo $(( deadline - $(date +%s) > 0 ? deadline - $(date +%s) : 1 )); }
+
+          echo "🧹 Deleting Gateways matching '${SELECTOR}':"
+          kubectl get gateways.gateway.networking.k8s.io --all-namespaces --selector "${SELECTOR}" --no-headers --ignore-not-found || :
+          kubectl delete gateways.gateway.networking.k8s.io --all-namespaces --selector "${SELECTOR}" \
+            --ignore-not-found --wait --timeout "$(remaining)s" \
+            || echo "⚠️ Gateways not gone before the deadline."
+
+          echo "🧹 Deleting GatewayClasses matching '${SELECTOR}':"
+          kubectl get gatewayclasses.gateway.networking.k8s.io --selector "${SELECTOR}" --no-headers --ignore-not-found || :
+          if kubectl delete gatewayclasses.gateway.networking.k8s.io --selector "${SELECTOR}" \
+            --ignore-not-found --wait --timeout "$(remaining)s"; then
+            echo "✅ Gateways and GatewayClasses of gateway-api-config are gone."
+            exit 0
+          fi
+
+          echo "⚠️ GatewayClasses still present. Gateways not created by gateway-api-config may still use them:"
+          kubectl get gateways.gateway.networking.k8s.io --all-namespaces --no-headers || :
+          echo "⚠️ Continuing the uninstall anyway."
+          exit 0
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+{{- end }}

@@ -166,6 +166,27 @@
             "type": "object",
             "additionalProperties": true
         },
+        "cleanup": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "gatewayApiConfig": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "image": {
+                            "type": "string"
+                        },
+                        "timeoutSeconds": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            }
+        },
         "cluster": {
             "type": "object",
             "additionalProperties": true

@@ -12,6 +12,9 @@ Gateway API bundle
 | organization | string | `""` |  |
 | migration.appToHelmRelease.enabled | bool | `true` |  |
 | migration.appToHelmRelease.image | string | `"gsoci.azurecr.io/giantswarm/docker-kubectl:1.37.2"` |  |
+| cleanup.gatewayApiConfig.enabled | bool | `true` |  |
+| cleanup.gatewayApiConfig.image | string | `"gsoci.azurecr.io/giantswarm/docker-kubectl:1.37.2"` |  |
+| cleanup.gatewayApiConfig.timeoutSeconds | int | `300` |  |
 | apps.gatewayApiCrds.appName | string | `"gateway-api-crds"` |  |
 | apps.gatewayApiCrds.chartName | string | `"gateway-api-crds"` |  |
 | apps.gatewayApiCrds.catalog | string | `"giantswarm"` |  |
