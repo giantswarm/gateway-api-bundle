@@ -31,14 +31,22 @@ Known limits:
   - Before deleting the App: set cleanup.gatewayApiConfig.enabled to false in
     its user values, let the App be upgraded, then delete it.
   - Once the App is deleted, a values change is no longer applied. Do by hand
-    what the hook does, then uninstall without it:
-    1. `kubectl delete helmrelease -n <namespace> <cluster>-gateway-api-config
-       --wait`, while Envoy Gateway still runs.
-    2. `helm uninstall --no-hooks -n <namespace> <bundle release>`. chart-operator
-       then finds no release, drops the Chart CR finalizer, and app-operator
-       drops the App CR one.
+    what the hook does, then uninstall without it. <namespace> is the App's
+    spec.namespace, where its HelmReleases and its Helm release live, and
+    <bundle release> is the App's name (`helm list -n <namespace>`).
+    1. Uninstall gateway-api-config while Envoy Gateway still runs:
+       kubectl delete helmreleases.helm.toolkit.fluxcd.io -n <namespace> <cluster>-gateway-api-config --timeout=5m
+       If it does not finish, a Gateway that gateway-api-config did not
+       create may still use the GatewayClass: delete that Gateway, or remove
+       the GatewayClass finalizer, and it goes on.
+    2. helm uninstall --no-hooks -n <namespace> <bundle release>
+       chart-operator then finds no release, drops the Chart CR finalizer,
+       and app-operator drops the App CR one.
+    3. Delete what is left of hooks that never ran:
+       kubectl delete serviceaccount,role,rolebinding,job -n <namespace> <bundle release>-gateway-cleanup --ignore-not-found
     Installed with Flux instead of as an App: step 1, then
-    spec.uninstall.disableHooks on the bundle HelmRelease.
+    spec.uninstall.disableHooks on the bundle HelmRelease (unless a
+    Kustomization still manages it and reverts the change), then step 3.
   - Removing the App and Chart CR finalizers instead skips the uninstall and
     leaves everything the bundle rendered: HelmReleases, OCIRepositories, values
     ConfigMaps and Secrets, the Crossplane IAM Role, the hook RBAC and the Helm
@@ -194,7 +202,8 @@ spec:
           # True only when a successful read finds no HelmRelease; a failed read is not "gone".
           gone() { out=$(kt "$(upto "${end}" "$1")" get "${HR}" --ignore-not-found --output name) && [ -z "${out}" ]; }
           # Errors that a retry cannot clear.
-          permanent() { grep -qiE "denied the request|admission webhook|doesn't have a resource type|no matches for kind" "${ERR}" 2>/dev/null; }
+          NO_CRD="doesn't have a resource type|no matches for kind"
+          permanent() { grep -qiE "denied the request|admission webhook|${NO_CRD}" "${ERR}" 2>/dev/null; }
           last_error() { [ -s "$1" ] && echo "⚠️ Last error: $(tail -n 1 "$1")"; }
 
           echo "🧹 Deleting ${HR} in ${NAMESPACE} and waiting for Flux to uninstall it."
@@ -220,8 +229,9 @@ spec:
 
           # Keep the error of the retries; the final check below writes its own.
           cp "${ERR}" "${ERR}.retries" 2>/dev/null || : > "${ERR}.retries"
-          if grep -qiE "doesn't have a resource type|no matches for kind" "${ERR}.retries"; then
-            echo "✅ No HelmRelease CRD in this cluster, nothing to clean up."
+          if grep -qiE "${NO_CRD}" "${ERR}.retries"; then
+            last_error "${ERR}.retries"
+            echo "⚠️ HelmRelease resource type not found, skipping the cleanup."
             exit 0
           fi
           if gone 8; then
