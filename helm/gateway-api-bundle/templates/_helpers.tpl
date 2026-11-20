@@ -173,3 +173,23 @@ AWS region, required.
 {{- end -}}
 {{- $aws.region -}}
 {{- end -}}
+
+{{/*
+duration.seconds — whole seconds of a Go duration as Flux accepts it, such as "10m",
+"90s", "1h30m" or "1.5h". Fractions of a second are dropped, but a duration of less than
+a second gives 1. Fails when nothing in it is a duration.
+*/}}
+{{- define "duration.seconds" -}}
+{{- $total := 0.0 -}}
+{{- $parts := regexFindAll "[0-9]+(\\.[0-9]+)?(ns|us|µs|ms|h|m|s)" . -1 -}}
+{{- if not $parts -}}
+{{- fail (printf "%q is not a duration, such as 10m" .) -}}
+{{- end -}}
+{{- range $part := $parts -}}
+{{- $n := regexFind "^[0-9]+(\\.[0-9]+)?" $part | float64 -}}
+{{- $unit := regexReplaceAll "^[0-9.]+" $part "" -}}
+{{- $factor := get (dict "h" 3600.0 "m" 60.0 "s" 1.0 "ms" 0.001 "us" 0.000001 "µs" 0.000001 "ns" 0.000000001) $unit -}}
+{{- $total = addf $total (mulf $n $factor) -}}
+{{- end -}}
+{{- max 1 (floor $total | int) -}}
+{{- end -}}

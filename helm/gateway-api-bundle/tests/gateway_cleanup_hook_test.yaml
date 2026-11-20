@@ -1,0 +1,230 @@
+suite: gateway cleanup pre-delete hook
+templates:
+  - templates/gateway-cleanup-hook.yaml
+release:
+  name: test-gateway-api-bundle
+  namespace: org-test
+set:
+  clusterID: test
+tests:
+  - it: renders a ServiceAccount, Role, RoleBinding and Job as pre-delete hooks
+    asserts:
+      - hasDocuments:
+          count: 4
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-delete
+      - equal:
+          path: metadata.name
+          value: test-gateway-api-bundle-gateway-cleanup
+      - equal:
+          path: metadata.namespace
+          value: org-test
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: gateway-cleanup
+      # Recovery step 3 in the template comment deletes leftovers by these two labels.
+      - equal:
+          path: metadata.labels["giantswarm.io/cluster"]
+          value: test
+
+  - it: creates the ServiceAccount before the Job and removes it after the hook
+    documentSelector:
+      path: kind
+      value: ServiceAccount
+    asserts: &rbacHook
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-1"
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+
+  - it: creates the Role before the Job and removes it after the hook
+    documentSelector:
+      path: kind
+      value: Role
+    asserts: *rbacHook
+
+  - it: creates the RoleBinding before the Job and removes it after the hook
+    documentSelector:
+      path: kind
+      value: RoleBinding
+    asserts: *rbacHook
+
+  - it: runs the Job after the RBAC and keeps it when it fails
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "0"
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+
+  - it: only gives the hook access to the gateway-api-config HelmRelease of the cluster
+    documentSelector:
+      path: kind
+      value: Role
+    asserts:
+      - equal:
+          path: rules
+          value:
+            - apiGroups:
+                - helm.toolkit.fluxcd.io
+              resources:
+                - helmreleases
+              resourceNames:
+                - test-gateway-api-config
+              verbs:
+                - get
+                - list
+                - watch
+                - delete
+
+  - it: runs the Job as the hook ServiceAccount against that HelmRelease
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: test-gateway-api-bundle-gateway-cleanup
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: gateway-cleanup
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HELMRELEASE
+            value: test-gateway-api-config
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NAMESPACE
+            value: org-test
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[1]
+          pattern: timeout -k 2 "\$\{t\}" kubectl
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[1]
+          pattern: delete "\$\{HR\}" --ignore-not-found --wait=false
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[1]
+          pattern: wait "\$\{HR\}" --for=delete
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[1]
+          pattern: Failing the uninstall
+
+  - it: follows a renamed gateway-api-config app
+    set:
+      apps.gatewayApiConfig.appName: my-gateways
+    asserts:
+      - contains:
+          path: rules[0].resourceNames
+          content: test-my-gateways
+        documentSelector:
+          path: kind
+          value: Role
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HELMRELEASE
+            value: test-my-gateways
+        documentSelector:
+          path: kind
+          value: Job
+
+  - it: waits as long as the gateway-api-config HelmRelease timeout, 10m by default
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TIMEOUT
+            value: "600"
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 690
+
+  - it: follows a custom gateway-api-config timeout
+    set:
+      apps.gatewayApiConfig.timeout: 1h30m
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TIMEOUT
+            value: "5400"
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 5490
+
+  - it: reads decimal gateway-api-config timeouts
+    set:
+      apps.gatewayApiConfig.timeout: 1.5h
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TIMEOUT
+            value: "5400"
+
+  - it: waits at least one second for a sub-second gateway-api-config timeout
+    set:
+      apps.gatewayApiConfig.timeout: 500ms
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TIMEOUT
+            value: "1"
+
+  - it: rejects a gateway-api-config timeout that is not a duration
+    set:
+      apps.gatewayApiConfig.timeout: soon
+    asserts:
+      - failedTemplate:
+          errorPattern: "soon.*not a duration"
+
+  - it: truncates the resource names to 63 characters
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^.{1,63}$
+
+  - it: is not rendered when disabled
+    set:
+      cleanup.gatewayApiConfig.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: is not rendered without gateway-api-config
+    set:
+      apps.gatewayApiConfig.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: is not rendered without envoy-gateway
+    set:
+      apps.envoyGateway.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
