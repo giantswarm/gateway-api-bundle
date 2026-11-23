@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-11-23
+
 ### Fixed
 
 - Deleting the bundle no longer hangs on the `gateway-exists-finalizer` of the GatewayClass. Flux only honours `dependsOn` on install and upgrade, so `envoy-gateway` could be uninstalled before `gateway-api-config`. A `pre-delete` hook now deletes the `gateway-api-config` HelmRelease and waits for Flux to uninstall it while Envoy Gateway still runs. It waits as long as that HelmRelease's timeout (`apps.gatewayApiConfig.timeout`, 10m by default) and fails the bundle uninstall when it is reached, so `envoy-gateway` is not removed before `gateway-api-config`. The bundle HelmRelease needs an uninstall timeout of at least that plus 2m (12m by default; Flux defaults to 5m). Disable the hook with `cleanup.gatewayApiConfig.enabled: false` and let Flux upgrade the bundle before deleting it. The comment in `helm/gateway-api-bundle/templates/gateway-cleanup-hook.yaml` lists what to do when the uninstall is stuck.
@@ -497,7 +499,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add envoy-gateway v0.2.0
 - Add gateway-api-config v0.1.0
 
-[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/giantswarm/gateway-api-bundle/compare/v2.0.0...v2.0.1
