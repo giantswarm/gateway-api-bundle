@@ -9,9 +9,8 @@
             "additionalProperties": false,
             "properties": {
                 "retries": {
-                    "description": "Number of retries before the install is given up. -1 retries forever.",
-                    "type": "integer",
-                    "minimum": -1
+                    "description": "Number of retries before the install is given up. A negative number retries forever.",
+                    "type": "integer"
                 },
                 "remediateLastFailure": {
                     "type": "boolean"
@@ -27,9 +26,8 @@
             "additionalProperties": false,
             "properties": {
                 "retries": {
-                    "description": "Number of retries before the upgrade is given up. -1 retries forever.",
-                    "type": "integer",
-                    "minimum": -1
+                    "description": "Number of retries before the upgrade is given up. A negative number retries forever.",
+                    "type": "integer"
                 },
                 "remediateLastFailure": {
                     "type": "boolean"

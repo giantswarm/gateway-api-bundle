@@ -104,12 +104,43 @@ tests:
               retries: -1
               remediateLastFailure: false
 
-  - it: rejects retries below -1
+  - it: lets an app turn off what the global defaults turn on
+    documentSelector:
+      path: spec.releaseName
+      value: envoy-gateway
     set:
-      remediation.install.retries: -2
+      remediation:
+        install:
+          retries: 5
+          ignoreTestFailures: true
+        upgrade:
+          retries: 10
+          remediateLastFailure: true
+      apps.envoyGateway.remediation:
+        install:
+          retries: 0
+          ignoreTestFailures: false
+        upgrade:
+          remediateLastFailure: false
+    asserts:
+      - equal:
+          path: spec.install.remediation
+          value:
+            retries: 0
+            remediateLastFailure: false
+            ignoreTestFailures: false
+      - equal:
+          path: spec.upgrade.remediation
+          value:
+            retries: 10
+            remediateLastFailure: false
+
+  - it: rejects retries that are not an integer
+    set:
+      remediation.install.retries: forever
     asserts:
       - failedTemplate:
-          errorPattern: "minimum: got -2, want -1"
+          errorPattern: "/remediation/install/retries"
 
   - it: rejects an upgrade strategy Flux does not know
     set:

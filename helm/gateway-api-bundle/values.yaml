@@ -26,6 +26,7 @@ cleanup:
 # Installs retry forever by default: when the bundle comes with a new cluster, its apps render
 # Kyverno, cert-manager and monitoring resources whose CRDs only exist once the cluster's default
 # apps are installed, and a release that ran out of retries stays Stalled until someone resets it.
+# An install that keeps failing for another reason is then only visible as Ready=False, not Stalled.
 remediation:  # @schema $ref: schemas/remediation.json; skipProperties: true
   install:
     retries: -1

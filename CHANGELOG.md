@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Installs now retry forever (`remediation.install.retries: -1`) instead of giving up after 3 retries. A bundle installed together with a new cluster renders Kyverno, cert-manager and monitoring resources whose CRDs only exist once the cluster's default apps are installed, and an app that ran out of retries stayed Stalled until someone reset it. Upgrades still give up after 3 retries without remediating the last failure.
+- Installs now retry forever (`remediation.install.retries: -1`) instead of giving up after 3 retries. A bundle installed together with a new cluster renders Kyverno, cert-manager and monitoring resources whose CRDs only exist once the cluster's default apps are installed, and an app that ran out of retries stayed Stalled until someone reset it. An install that keeps failing for another reason now shows as `Ready=False` instead of `Stalled`. Upgrades still give up after 3 retries without remediating the last failure.
 
 ## [2.1.1] - 2026-11-23
 

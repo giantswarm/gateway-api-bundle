@@ -119,8 +119,7 @@
                         },
                         "retries": {
                             "type": "integer",
-                            "description": "Number of retries before the install is given up. -1 retries forever.",
-                            "minimum": -1
+                            "description": "Number of retries before the install is given up. A negative number retries forever."
                         }
                     }
                 },
@@ -137,8 +136,7 @@
                         },
                         "retries": {
                             "type": "integer",
-                            "description": "Number of retries before the upgrade is given up. -1 retries forever.",
-                            "minimum": -1
+                            "description": "Number of retries before the upgrade is given up. A negative number retries forever."
                         },
                         "strategy": {
                             "type": "string",
