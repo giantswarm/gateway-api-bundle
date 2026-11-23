@@ -1,0 +1,133 @@
+suite: install and upgrade remediation
+templates:
+  - templates/helmreleases.yaml
+release:
+  name: gateway-api-bundle
+  namespace: org-test
+set:
+  clusterID: test
+tests:
+  - it: retries installs forever and keeps upgrades at 3 retries by default
+    documentSelector:
+      path: spec.releaseName
+      value: gateway-api-config
+    asserts:
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: spec.install
+          value:
+            createNamespace: true
+            remediation:
+              retries: -1
+              remediateLastFailure: false
+      - equal:
+          path: spec.upgrade
+          value:
+            remediation:
+              retries: 3
+              remediateLastFailure: false
+
+  - it: applies the global defaults to every app
+    documentSelector:
+      path: spec.releaseName
+      value: gateway-api-crds
+    set:
+      remediation:
+        install:
+          retries: 5
+        upgrade:
+          retries: 10
+          remediateLastFailure: true
+          strategy: rollback
+    asserts:
+      - equal:
+          path: spec.install.remediation
+          value:
+            retries: 5
+            remediateLastFailure: false
+      - equal:
+          path: spec.upgrade.remediation
+          value:
+            retries: 10
+            remediateLastFailure: true
+            strategy: rollback
+
+  - it: merges an app's remediation over the global defaults field by field
+    documentSelector:
+      path: spec.releaseName
+      value: envoy-gateway
+    set:
+      apps.envoyGateway.remediation:
+        upgrade:
+          remediateLastFailure: true
+          strategy: rollback
+    asserts:
+      - equal:
+          path: spec.install.remediation
+          value:
+            retries: -1
+            remediateLastFailure: false
+      - equal:
+          path: spec.upgrade.remediation
+          value:
+            retries: 3
+            remediateLastFailure: true
+            strategy: rollback
+
+  - it: leaves the other apps on the global defaults when one app overrides
+    documentSelector:
+      path: spec.releaseName
+      value: gateway-api-config
+    set:
+      apps.envoyGateway.remediation:
+        install:
+          retries: 1
+    asserts:
+      - equal:
+          path: spec.install.remediation.retries
+          value: -1
+
+  - it: keeps skipCRDs next to the remediation
+    documentSelector:
+      path: spec.releaseName
+      value: envoy-gateway
+    set:
+      apps.envoyGateway.skipCRDs: true
+    asserts:
+      - equal:
+          path: spec.install
+          value:
+            createNamespace: true
+            crds: Skip
+            remediation:
+              retries: -1
+              remediateLastFailure: false
+
+  - it: rejects retries below -1
+    set:
+      remediation.install.retries: -2
+    asserts:
+      - failedTemplate:
+          errorPattern: "minimum: got -2, want -1"
+
+  - it: rejects an upgrade strategy Flux does not know
+    set:
+      apps.envoyGateway.remediation.upgrade.strategy: reinstall
+    asserts:
+      - failedTemplate:
+          errorPattern: "value must be one of 'rollback', 'uninstall'"
+
+  - it: rejects a strategy for installs
+    set:
+      remediation.install.strategy: rollback
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'strategy' not allowed"
+
+  - it: rejects unknown remediation fields
+    set:
+      apps.envoyGateway.remediation.install.retry: 5
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'retry' not allowed"

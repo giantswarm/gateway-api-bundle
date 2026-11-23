@@ -1,0 +1,50 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "install": {
+            "description": "Merged into spec.install.remediation of the HelmRelease.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "retries": {
+                    "description": "Number of retries before the install is given up. -1 retries forever.",
+                    "type": "integer",
+                    "minimum": -1
+                },
+                "remediateLastFailure": {
+                    "type": "boolean"
+                },
+                "ignoreTestFailures": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "upgrade": {
+            "description": "Merged into spec.upgrade.remediation of the HelmRelease.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "retries": {
+                    "description": "Number of retries before the upgrade is given up. -1 retries forever.",
+                    "type": "integer",
+                    "minimum": -1
+                },
+                "remediateLastFailure": {
+                    "type": "boolean"
+                },
+                "ignoreTestFailures": {
+                    "type": "boolean"
+                },
+                "strategy": {
+                    "type": "string",
+                    "enum": [
+                        "rollback",
+                        "uninstall"
+                    ]
+                }
+            }
+        }
+    }
+}

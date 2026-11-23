@@ -21,6 +21,19 @@ cleanup:
     enabled: true
     image: gsoci.azurecr.io/giantswarm/docker-kubectl:1.37.2
 
+# Install and upgrade remediation of the apps' HelmReleases, as in their spec.install.remediation
+# and spec.upgrade.remediation. Set apps.<app>.remediation to override single fields for one app.
+# Installs retry forever by default: when the bundle comes with a new cluster, its apps render
+# Kyverno, cert-manager and monitoring resources whose CRDs only exist once the cluster's default
+# apps are installed, and a release that ran out of retries stays Stalled until someone resets it.
+remediation:  # @schema $ref: schemas/remediation.json; skipProperties: true
+  install:
+    retries: -1
+    remediateLastFailure: false
+  upgrade:
+    retries: 3
+    remediateLastFailure: false
+
 apps:  # @schema additionalProperties: true
   gatewayApiCrds:  # @schema $ref: schemas/app.json; skipProperties: true
     appName: gateway-api-crds
