@@ -5,6 +5,9 @@
 {{- range $key, $value := .Values.apps }}
 {{- $appName := include "app.name" (dict "app" .appName "cluster" $.Values.clusterID "ns" $.Release.Namespace) }}
 {{- if and .enabled $appName }}
+{{- $remediation := mergeOverwrite (deepCopy ($.Values.remediation | default dict)) (deepCopy (.remediation | default dict)) }}
+{{- $_ := set $remediation "install" ($remediation.install | default dict) }}
+{{- $_ := set $remediation "upgrade" ($remediation.upgrade | default dict) }}
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
@@ -56,12 +59,10 @@ spec:
     crds: Skip
     {{- end }}
     remediation:
-      retries: 3
-      remediateLastFailure: false
+      {{- $remediation.install | toYaml | nindent 6 }}
   upgrade:
     remediation:
-      retries: 3
-      remediateLastFailure: false
+      {{- $remediation.upgrade | toYaml | nindent 6 }}
   {{- $hasUserConfigMap := false }}
   {{- $hasUserSecret := false }}
   {{- with .userConfig }}

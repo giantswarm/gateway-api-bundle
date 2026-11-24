@@ -72,6 +72,9 @@
                 "namespace": {
                     "type": "string"
                 },
+                "remediation": {
+                    "$ref": "#/$defs/remediation.json"
+                },
                 "skipCRDs": {
                     "type": "boolean"
                 },
@@ -95,6 +98,54 @@
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "remediation.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "install": {
+                    "type": "object",
+                    "description": "Merged into spec.install.remediation of the HelmRelease.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "ignoreTestFailures": {
+                            "type": "boolean"
+                        },
+                        "remediateLastFailure": {
+                            "type": "boolean"
+                        },
+                        "retries": {
+                            "type": "integer",
+                            "description": "Number of retries before the install is given up. A negative number retries forever."
+                        }
+                    }
+                },
+                "upgrade": {
+                    "type": "object",
+                    "description": "Merged into spec.upgrade.remediation of the HelmRelease.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "ignoreTestFailures": {
+                            "type": "boolean"
+                        },
+                        "remediateLastFailure": {
+                            "type": "boolean"
+                        },
+                        "retries": {
+                            "type": "integer",
+                            "description": "Number of retries before the upgrade is given up. A negative number retries forever."
+                        },
+                        "strategy": {
+                            "type": "string",
+                            "enum": [
+                                "rollback",
+                                "uninstall"
+                            ]
+                        }
+                    }
                 }
             }
         }
@@ -271,6 +322,11 @@
         },
         "provider": {
             "type": "string"
+        },
+        "remediation": {
+            "$ref": "#/$defs/remediation.json",
+            "type": "object",
+            "unevaluatedProperties": false
         },
         "subscriptionID": {
             "type": "string"
