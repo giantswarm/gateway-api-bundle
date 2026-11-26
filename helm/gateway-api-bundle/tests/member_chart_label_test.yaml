@@ -1,0 +1,65 @@
+suite: member-chart label
+templates:
+  - templates/helmreleases.yaml
+release:
+  name: gateway-api-bundle
+  namespace: org-test
+set:
+  clusterID: test
+tests:
+  - it: labels the envoy-gateway OCIRepository with its chart name
+    documentSelector:
+      path: spec.url
+      value: oci://gsoci.azurecr.io/charts/giantswarm/envoy-gateway
+      matchMany: true
+    asserts:
+      - isKind:
+          of: OCIRepository
+      - equal:
+          path: metadata.labels["bundle.giantswarm.io/member-chart"]
+          value: envoy-gateway
+
+  - it: labels the gateway-api-config OCIRepository with its chart name
+    documentSelector:
+      path: spec.url
+      value: oci://gsoci.azurecr.io/charts/giantswarm/gateway-api-config
+      matchMany: true
+    asserts:
+      - isKind:
+          of: OCIRepository
+      - equal:
+          path: metadata.labels["bundle.giantswarm.io/member-chart"]
+          value: gateway-api-config
+
+  - it: labels the gateway-api-crds OCIRepository with its chart name
+    documentSelector:
+      path: spec.url
+      value: oci://gsoci.azurecr.io/charts/giantswarm/gateway-api-crds
+      matchMany: true
+    asserts:
+      - isKind:
+          of: OCIRepository
+      - equal:
+          path: metadata.labels["bundle.giantswarm.io/member-chart"]
+          value: gateway-api-crds
+
+  - it: labels the kube-state-metrics OCIRepository with its chart name
+    documentSelector:
+      path: spec.url
+      value: oci://gsoci.azurecr.io/charts/giantswarm/kube-state-metrics
+      matchMany: true
+    asserts:
+      - isKind:
+          of: OCIRepository
+      - equal:
+          path: metadata.labels["bundle.giantswarm.io/member-chart"]
+          value: kube-state-metrics
+
+  - it: does not label the member HelmReleases
+    documentSelector:
+      path: kind
+      value: HelmRelease
+      matchMany: true
+    asserts:
+      - notExists:
+          path: metadata.labels["bundle.giantswarm.io/member-chart"]
